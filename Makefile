@@ -1,14 +1,14 @@
-bbfs : bbfs.o log.o
-	gcc -g -o bbfs bbfs.o log.o `pkg-config fuse --libs`
+lazfs : lazfs.o log.o
+	gcc -g -o lazfs lazfs.o log.o `pkg-config fuse --libs`
 
-bbfs.o : bbfs.c log.h params.h
-	gcc -g -Wall `pkg-config fuse --cflags` -c bbfs.c
+lazfs.o : lazfs.c log.h params.h
+	gcc -g -Wall `pkg-config fuse --cflags` -c lazfs.c
 
 log.o : log.c log.h params.h
 	gcc -g -Wall `pkg-config fuse --cflags` -c log.c
 
 clean:
-	rm -f bbfs *.o
+	rm -f lazfs *.o
 
 dist:
 	rm -rf fuse-tutorial/
