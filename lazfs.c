@@ -41,6 +41,7 @@
 #include <sys/xattr.h>
 
 #include "log.h"
+#include "util.h"
 
 // Report errors to logfile and give -errno to caller
 static int bb_error(char *str)
@@ -370,6 +371,11 @@ int bb_open(const char *path, struct fuse_file_info *fi)
 	    path, fi);
     bb_fullpath(fpath, path);
     
+    if (is_lasfile(path)) {
+	/* Decompress .laz here */
+        /* Cache here */
+    }
+
     fd = open(fpath, fi->flags);
     if (fd < 0)
 	retstat = bb_error("bb_open open");
@@ -404,7 +410,11 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
 	    path, buf, size, offset, fi);
     // no need to get fpath on this one, since I work from fi->fh not the path
     log_fi(fi);
-    
+
+    if (is_lasfile(path)) {
+        /* Get cached file here and read from it */
+    }
+
     retstat = pread(fi->fh, buf, size, offset);
     if (retstat < 0)
 	retstat = bb_error("bb_read read");
@@ -433,6 +443,11 @@ int bb_write(const char *path, const char *buf, size_t size, off_t offset,
     // no need to get fpath on this one, since I work from fi->fh not the path
     log_fi(fi);
 	
+    if (is_lasfile(path)) {
+	/* We don't support writting, yet */
+        return -ENOSYS;
+    }
+
     retstat = pwrite(fi->fh, buf, size, offset);
     if (retstat < 0)
 	retstat = bb_error("bb_write pwrite");
@@ -521,6 +536,10 @@ int bb_release(const char *path, struct fuse_file_info *fi)
     log_msg("\nbb_release(path=\"%s\", fi=0x%08x)\n",
 	  path, fi);
     log_fi(fi);
+
+    if (is_lasfile(path)) {
+	/* Remove file entry from cache */
+    }
 
     // We need to close the file.  Had we allocated any resources
     // (buffers etc) we'd need to free them here as well.
