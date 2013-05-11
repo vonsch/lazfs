@@ -1,8 +1,11 @@
-lazfs : lazfs.o log.o
-	gcc -g -o lazfs lazfs.o log.o `pkg-config fuse --libs`
+lazfs : lazfs.o log.o util.o
+	gcc -g -o lazfs lazfs.o util.o log.o `pkg-config fuse --libs`
 
 lazfs.o : lazfs.c log.h params.h
 	gcc -g -Wall `pkg-config fuse --cflags` -c lazfs.c
+
+util.o: util.c util.h
+	gcc -g -Wall -c util.c
 
 log.o : log.c log.h params.h
 	gcc -g -Wall `pkg-config fuse --cflags` -c log.c
