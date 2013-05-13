@@ -66,9 +66,7 @@ decompress(const char *name, int fd)
 
     tmpfd = mkstemp(tmpfilename);
     if (tmpfd == -1) {
-	log_error("    ERROR: mkstemp failed failed: %s\n",
-		LASError_GetLastErrorMsg());
-	retstat = -errno;
+	bb_error("decompress mkstemp");
 	goto cleanup;
     }
 
