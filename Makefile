@@ -5,7 +5,7 @@ lazfs.o : lazfs.c log.h params.h
 	gcc -g -Wall `pkg-config fuse --cflags` -c lazfs.c
 
 util.o: util.c util.h
-	gcc -g -Wall -c util.c
+	gcc -g -Wall `pkg-config fuse --cflags` -c util.c
 
 log.o : log.c log.h params.h
 	gcc -g -Wall `pkg-config fuse --cflags` -c log.c

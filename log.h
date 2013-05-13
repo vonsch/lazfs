@@ -7,6 +7,8 @@
 
 #ifndef _LOG_H_
 #define _LOG_H_
+#include "params.h"
+#include <fuse.h>
 #include <stdio.h>
 
 //  macro to log fields in structs.
@@ -20,4 +22,8 @@ void log_statvfs(struct statvfs *sv);
 void log_utime(struct utimbuf *buf);
 
 void log_msg(const char *format, ...);
+
+// Report errors to logfile and give -errno to caller
+int bb_error(const char *str);
+
 #endif

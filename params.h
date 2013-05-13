@@ -15,6 +15,7 @@
 // needs to define the version of the API that we assume.  As of this
 // writing, the most current API version is 26
 #define FUSE_USE_VERSION 26
+#include <fuse.h>
 
 // need this to get pwrite().  I have to use setvbuf() instead of
 // setlinebuf() later in consequence.

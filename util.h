@@ -12,4 +12,7 @@
 /* Returns non-zero value if filename ends with ".las" */
 char is_lasfile(const char *filename);
 
+/* Decompresses file from opened fd and caches it */
+int decompress(const char *name, int fd);
+
 #endif
