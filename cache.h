@@ -24,7 +24,11 @@ void cache_destroy(las_cache_t **cachep);
 int cache_add(las_cache_t *cache, const char *filename,
 	      const char *tmpfilename, int tmpfd);
 
-/* Removes file from cache and unlinks temporary decompressed file */
+/* Removes file from cache */
 int cache_remove(las_cache_t *cache, const char *filename);
+
+/* Get item from cache. Returns zero if found. */
+int cache_get(las_cache_t *cache, const char *filename, char **tmpfilename,
+	      int *tmpfd);
 
 #endif

@@ -372,13 +372,14 @@ int bb_open(const char *path, struct fuse_file_info *fi)
     LASWriterH writer = NULL;
     LASHeaderH wheader = NULL;
     LASPointH p = NULL;
+    las_cache_t *cache = BB_DATA->cache;
     
     log_msg("\nbb_open(path\"%s\", fi=0x%08x)\n",
 	    path, fi);
     bb_fullpath(fpath, path);
     
     if (is_lasfile(path)) {
-	/* We got request for .las file, open the .laz and decompress it */
+	/* We got request for .las file */
 	strncpy(fpath_laz, fpath, PATH_MAX);
 	fpath_laz[PATH_MAX - 1] = '\0';
 	fpath_laz[strlen(fpath_laz) - 1] = 'z';
@@ -390,6 +391,10 @@ int bb_open(const char *path, struct fuse_file_info *fi)
 	    retstat = bb_error("bb_open open");
 	    goto cleanup;
 	}
+
+	/* Check if we already decompressed it */
+	if (cache_get(cache, path, NULL, &tmpfd) == 0)
+	    goto cached;
 
 	tmpfd = mkstemp(tmpfilename);
 	if (tmpfd == -1) {
@@ -447,7 +452,12 @@ int bb_open(const char *path, struct fuse_file_info *fi)
 	LASReader_Destroy(reader);
 	LASHeader_Destroy(wheader);
 
-	/* Cache opened file */
+	/* Cache that this .laz file is already decompressed */
+	retstat = cache_add(cache, path, tmpfilename, tmpfd);
+	if (retstat != 0) {
+	    log_msg("    ERROR: bb_open - cache_add failed\n");
+	    goto cleanup;
+	}
     } else {
 	fd = open(fpath, fi->flags);
 	if (fd < 0) {
@@ -456,6 +466,7 @@ int bb_open(const char *path, struct fuse_file_info *fi)
 	}
     }
 
+cached:
     fi->fh = fd;
     log_fi(fi);
 

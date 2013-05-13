@@ -158,3 +158,25 @@ cache_remove(las_cache_t *cache, const char *filename)
 
     return 0;
 }
+
+int
+cache_get(las_cache_t *cache, const char *filename, char **tmpfilename,
+	  int *tmpfd)
+{
+    file_entry_t *entry;
+
+    assert(cache != NULL);
+    assert(filename != NULL);
+    assert(tmpfd != NULL);
+
+    for (entry = cache->lh_first; entry != NULL; entry = entry->link.le_next) {
+	if (strcmp(entry->name, filename) == 0) {
+	    *tmpfd = entry->tmpfd;
+	    if (tmpfilename)
+		*tmpfilename = entry->tmpname;
+	    break;
+	}
+    }
+
+    return (entry != NULL) ? 0 : 1;
+}
