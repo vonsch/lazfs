@@ -9,8 +9,11 @@
 #define _UTIL_H_
 #include <string.h>
 
-/* Returns non-zero value if filename ends with ".las" */
-char is_lasfile(const char *filename);
+/*
+ * Returns non-zero value if fpath should be handled specially (i.e.
+ * decompressed to /tmp/ background file). Note that fpath _must_ be full path.
+ */
+char exec_hooks(const char *fpath);
 
 /* Decompresses file from opened fd and caches it */
 int decompress(const char *name, int fd);

@@ -88,7 +88,7 @@ int bb_getattr(const char *path, struct stat *statbuf)
 	      path, statbuf);
     bb_fullpath(fpath, path);
 
-    if (is_lasfile(path)) {
+    if (exec_hooks(fpath)) {
         /* We got request for .las file */
         strncpy(fpath_laz, fpath, PATH_MAX);
         fpath_laz[PATH_MAX - 1] = '\0';
@@ -432,7 +432,7 @@ int bb_open(const char *path, struct fuse_file_info *fi)
 	      path, fi);
     bb_fullpath(fpath, path);
     
-    if (is_lasfile(path)) {
+    if (exec_hooks(fpath)) {
 	/* We got request for .las file */
 	strncpy(fpath_laz, fpath, PATH_MAX);
 	fpath_laz[PATH_MAX - 1] = '\0';
@@ -490,13 +490,14 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
     int retstat = 0;
     int tmpfd = -1;
     las_cache_t *cache = BB_DATA->cache;
+    char fpath[PATH_MAX];
     
     log_debug("\nbb_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 	      path, buf, size, offset, fi);
-    // no need to get fpath on this one, since I work from fi->fh not the path
     log_fi(fi);
+    bb_fullpath(fpath, path);
 
-    if (is_lasfile(path)) {
+    if (exec_hooks(fpath)) {
 	retstat = cache_get(cache, path, NULL, &tmpfd);
 	/* Every read file must have been opened & cached */
 	assert(retstat == 0);
@@ -524,13 +525,14 @@ int bb_write(const char *path, const char *buf, size_t size, off_t offset,
 	     struct fuse_file_info *fi)
 {
     int retstat = 0;
+    char fpath[PATH_MAX];
     
     log_debug("\nbb_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 	      path, buf, size, offset, fi);
-    // no need to get fpath on this one, since I work from fi->fh not the path
     log_fi(fi);
+    bb_fullpath(fpath, path);
 	
-    if (is_lasfile(path)) {
+    if (exec_hooks(path)) {
 	/* We don't support writting, yet */
         return -ENOSYS;
     }
@@ -623,12 +625,14 @@ int bb_release(const char *path, struct fuse_file_info *fi)
     char tmpfilename2[PATH_MAX];
     int tmpfd;
     las_cache_t *cache = BB_DATA->cache;
+    char fpath[PATH_MAX];
     
     log_debug("\nbb_release(path=\"%s\", fi=0x%08x)\n",
 	      path, fi);
     log_fi(fi);
+    bb_fullpath(fpath, path);
 
-    if (is_lasfile(path)) {
+    if (exec_hooks(fpath)) {
 	retstat = cache_get(cache, path, &tmpfilename, &tmpfd);
 	assert(retstat == 0); /* This file must have been opened & cached */
 
@@ -1027,12 +1031,14 @@ int bb_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *f
     int retstat = 0, tmpfd;
     las_cache_t *cache = BB_DATA->cache;
     struct stat tmpstatbuf;
+    char fpath[PATH_MAX];
     
     log_debug("\nbb_fgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n",
 	      path, statbuf, fi);
     log_fi(fi);
+    bb_fullpath(fpath, path);
 
-    if (is_lasfile(path)) {
+    if (exec_hooks(fpath)) {
 	/* File must have been already opened via open() */
 	retstat = cache_get(cache, path, NULL, &tmpfd);
 	assert(retstat == 0);

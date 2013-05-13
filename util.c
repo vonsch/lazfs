@@ -16,20 +16,28 @@
 #include <liblas/capi/liblas.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 char
-is_lasfile(const char *filename)
+exec_hooks(const char *fpath)
 {
     size_t len;
+    int ret;
     const char *laz_suffix;
+    struct stat stbuf;
 
-    len = strlen(filename);
+    /* Don't exec hooks if requested file exists */
+    ret = lstat(fpath, &stbuf);
+    if (ret == 0)
+	return 0;
+
+    len = strlen(fpath);
     if (len < 4)
 	return 0;
 
-    laz_suffix = filename + len - 4;
-    assert(laz_suffix >= filename);
+    laz_suffix = fpath + len - 4;
+    assert(laz_suffix >= fpath);
     if (strncmp(laz_suffix, ".las", 4) == 0)
 	return 1;
 
