@@ -23,6 +23,8 @@
 
 #include "log.h"
 
+char debug = 0;
+
 FILE *log_open()
 {
     FILE *logfile;
@@ -41,11 +43,22 @@ FILE *log_open()
     return logfile;
 }
 
-void log_msg(const char *format, ...)
+void log_error(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
 
+    vfprintf(BB_DATA->logfile, format, ap);
+}
+
+void log_debug(const char *format, ...)
+{
+    va_list ap;
+
+    if (!debug)
+	return;
+
+    va_start(ap, format);
     vfprintf(BB_DATA->logfile, format, ap);
 }
     

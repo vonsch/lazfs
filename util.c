@@ -41,7 +41,7 @@ bb_error(const char *str)
 {
     int ret = -errno;
 
-    log_msg("    ERROR %s: %s\n", str, strerror(errno));
+    log_error("    ERROR %s: %s\n", str, strerror(errno));
 
     return ret;
 }
@@ -58,7 +58,7 @@ decompress(const char *name, int fd)
     int tmpfd = -1;
     int retstat = 0;
 
-    log_msg("\ndecompressing file \"%s\"\n", name);
+    log_debug("\ndecompressing file \"%s\"\n", name);
 
     /* Check if we already decompressed it */
     if (cache_get(cache, name, NULL, &tmpfd) == 0)
@@ -66,7 +66,7 @@ decompress(const char *name, int fd)
 
     tmpfd = mkstemp(tmpfilename);
     if (tmpfd == -1) {
-	log_msg("    ERROR: mkstemp failed failed: %s\n",
+	log_error("    ERROR: mkstemp failed failed: %s\n",
 		LASError_GetLastErrorMsg());
 	retstat = -errno;
 	goto cleanup;
@@ -74,7 +74,7 @@ decompress(const char *name, int fd)
 
     reader = LASReader_CreateFd(fd);
     if (reader == NULL) {
-	log_msg("    ERROR: LASReader_CreateFd failed: %s\n",
+	log_error("    ERROR: LASReader_CreateFd failed: %s\n",
 		LASError_GetLastErrorMsg());
 	/* FIXME: We should return more codes */
 	retstat = -ENOMEM;
@@ -83,7 +83,7 @@ decompress(const char *name, int fd)
 
     wheader = LASHeader_Copy(LASReader_GetHeader(reader));
     if (wheader == NULL) {
-	log_msg("    ERROR: LASHeader_Copy failed: %s\n",
+	log_error("    ERROR: LASHeader_Copy failed: %s\n",
 		LASError_GetLastErrorMsg());
 	/* FIXME: Return more codes? */
 	retstat = -ENOMEM;
@@ -91,7 +91,7 @@ decompress(const char *name, int fd)
     }
 
     if (LASHeader_SetCompressed(wheader, 0) != 0) {
-	log_msg("    ERROR: LASHeader_SetCompressed failed: %s\n",
+	log_error("    ERROR: LASHeader_SetCompressed failed: %s\n",
 	LASError_GetLastErrorMsg());
 	retstat = -ENOMEM; /* FIXME: What's more appropriate errno? */
 	goto cleanup;
@@ -99,7 +99,7 @@ decompress(const char *name, int fd)
 
     writer = LASWriter_CreateFd(tmpfd, wheader, LAS_MODE_WRITE);
     if (writer == NULL) {
-	log_msg("    ERROR: LASWriter_CreateFd failed: %s\n",
+	log_error("    ERROR: LASWriter_CreateFd failed: %s\n",
 	LASError_GetLastErrorMsg());
 	retstat = -ENOMEM;
 	goto cleanup;
@@ -109,7 +109,7 @@ decompress(const char *name, int fd)
     p = LASReader_GetNextPoint(reader);
     while (p) {
 	if (LASWriter_WritePoint(writer, p) != LE_None) {
-	    log_msg("    ERROR: LASWriter_WritePoint failed: %s\n",
+	    log_error("    ERROR: LASWriter_WritePoint failed: %s\n",
 		     LASError_GetLastErrorMsg());
 	    /* FIXME: Is there more appropriate errno? */
 	    retstat = -ENOSPC;
@@ -125,7 +125,7 @@ decompress(const char *name, int fd)
     /* Cache that this .laz file is already decompressed */
     retstat = cache_add(cache, name, tmpfilename, tmpfd);
     if (retstat != 0) {
-	log_msg("    ERROR: bb_open - cache_add failed\n");
+	log_error("    ERROR: bb_open - cache_add failed\n");
 	goto cleanup;
     }
 
