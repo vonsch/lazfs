@@ -10,6 +10,7 @@
 #include "cache.h"
 #include <assert.h>
 #include <errno.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/queue.h>
@@ -23,7 +24,10 @@ struct file_entry {
     LIST_ENTRY(file_entry) link;
 };
 
-typedef LIST_HEAD(las_cache, file_entry) las_cache_t;
+typedef struct las_cache {
+    pthread_mutex_t lock;
+    LIST_HEAD(file_entries, file_entry) entries;
+} las_cache_t;
 
 static void
 file_entry_destroy(file_entry_t **entryp)
@@ -85,6 +89,7 @@ int
 cache_create(las_cache_t **cachep)
 {
     las_cache_t *cache;
+    int ret;
 
     assert(cachep != NULL && *cachep == NULL);
 
@@ -92,7 +97,9 @@ cache_create(las_cache_t **cachep)
     if (cache == NULL)
 	return -errno;
 
-    LIST_INIT(cache);
+    LIST_INIT(&cache->entries);
+    ret = pthread_mutex_init(&cache->lock, NULL);
+    assert(ret == 0); /* This should't fail */
 
     *cachep = cache;
 
@@ -104,16 +111,20 @@ cache_destroy(las_cache_t **cachep)
 {
     las_cache_t *cache;
     file_entry_t *entry;
+    int ret;
 
     assert(cachep != NULL && *cachep != NULL);
 
     cache = *cachep;
 
-    while (cache->lh_first != NULL) {
-	entry = cache->lh_first;
-	LIST_REMOVE(cache->lh_first, link);
+    while (cache->entries.lh_first != NULL) {
+	entry = cache->entries.lh_first;
+	LIST_REMOVE(cache->entries.lh_first, link);
 	file_entry_destroy(&entry);
     }
+
+    ret = pthread_mutex_destroy(&cache->lock);
+    assert(ret == 0); /* This shouldn't fail */
 
     free(cache);
     *cachep = NULL;
@@ -132,7 +143,7 @@ cache_add(las_cache_t *cache, const char *filename, const char *tmpfilename,
     if (err)
 	return err;
 
-    LIST_INSERT_HEAD(cache, entry, link);
+    LIST_INSERT_HEAD(&cache->entries, entry, link);
 
     return 0;
 }
@@ -146,10 +157,10 @@ cache_remove(las_cache_t *cache, const char *filename)
     assert(filename != NULL);
 
     /* FIXME: Should we treat empty cache as error? */
-    if (cache->lh_first == NULL)
+    if (cache->entries.lh_first == NULL)
 	return;
 
-    for (entry = cache->lh_first; entry != NULL; entry = entry->link.le_next) {
+    for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
 	if (strcmp(entry->name, filename) == 0) {
 	    LIST_REMOVE(entry, link);
 	    file_entry_destroy(&entry);
@@ -170,7 +181,7 @@ cache_get(las_cache_t *cache, const char *filename, char **tmpfilename,
     assert(filename != NULL);
     assert(tmpfd != NULL);
 
-    for (entry = cache->lh_first; entry != NULL; entry = entry->link.le_next) {
+    for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
 	if (strcmp(entry->name, filename) == 0) {
 	    *tmpfd = entry->tmpfd;
 	    if (tmpfilename)
