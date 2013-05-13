@@ -22,7 +22,7 @@ char
 is_lasfile(const char *filename)
 {
     size_t len;
-    char *laz_suffix;
+    const char *laz_suffix;
 
     len = strlen(filename);
     if (len < 4)
