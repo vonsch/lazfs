@@ -153,6 +153,7 @@ cache_remove(las_cache_t *cache, const char *filename)
 	if (strcmp(entry->name, filename) == 0) {
 	    LIST_REMOVE(entry, link);
 	    file_entry_destroy(&entry);
+	    return;
         }
     }
 
