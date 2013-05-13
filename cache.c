@@ -137,7 +137,7 @@ cache_add(las_cache_t *cache, const char *filename, const char *tmpfilename,
     return 0;
 }
 
-int
+void
 cache_remove(las_cache_t *cache, const char *filename)
 {
     file_entry_t *entry;
@@ -147,7 +147,7 @@ cache_remove(las_cache_t *cache, const char *filename)
 
     /* FIXME: Should we treat empty cache as error? */
     if (cache->lh_first == NULL)
-	return 0;
+	return;
 
     for (entry = cache->lh_first; entry != NULL; entry = entry->link.le_next) {
 	if (strcmp(entry->name, filename) == 0) {
@@ -157,8 +157,6 @@ cache_remove(las_cache_t *cache, const char *filename)
     }
 
     /* FIXME: Treat cache notfound as error? */
-
-    return 0;
 }
 
 int
