@@ -94,6 +94,8 @@ cache_create(las_cache_t **cachep)
 
     LIST_INIT(cache);
 
+    *cachep = cache;
+
     return 0;
 }
 
