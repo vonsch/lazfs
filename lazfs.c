@@ -74,9 +74,14 @@ static void bb_fullpath(char fpath[PATH_MAX], const char *path)
  */
 int bb_getattr(const char *path, struct stat *statbuf)
 {
-    int retstat = 0;
+    int retstat = 0, ret;
     char fpath[PATH_MAX];
     char fpath_laz[PATH_MAX];
+    char *tmpfilename;
+    char decompressed = 0;
+    int fd = -1, tmpfd;
+    las_cache_t *cache = BB_DATA->cache;
+    struct stat tmpstatbuf;
 
     log_msg("\nbb_getattr(path=\"%s\", statbuf=0x%08x)\n",
 	  path, statbuf);
@@ -89,14 +94,68 @@ int bb_getattr(const char *path, struct stat *statbuf)
         fpath_laz[strlen(fpath_laz) - 1] = 'z';
 
 	retstat = lstat(fpath_laz, statbuf);
-    } else
+	if (retstat != 0) {
+	    retstat = bb_error("bb_getattr lstat");
+	    goto cleanup;
+	}
+
+	if (cache_get(cache, path, &tmpfilename, &tmpfd) == 0)
+	    goto cached;
+
+	/* We must decompress file to get it's length, sigh */
+        fd = open(fpath_laz, O_RDONLY);
+        if (fd < 0) {
+            retstat = bb_error("bb_getattr open");
+            goto cleanup;
+        }
+
+        retstat = decompress(path, fd);
+        if (retstat != 0) {
+	    log_msg("    ERROR: bb_getattr: decompress failed");
+            goto cleanup;
+	} else {
+	    decompressed = 1;
+	    retstat = cache_get(cache, path, &tmpfilename, &tmpfd);
+	    assert(retstat == 0);
+	}
+cached:
+	retstat = lstat(tmpfilename, &tmpstatbuf);
+	if (retstat != 0) {
+	    retstat = bb_error("bb_getattr tmpfile lstat");
+	    goto cleanup;
+	}
+
+	/* Merge attributes to output statbuf */
+	statbuf->st_size = tmpstatbuf.st_size;
+	statbuf->st_atime = tmpstatbuf.st_atime;
+	statbuf->st_mtime = tmpstatbuf.st_mtime;
+	statbuf->st_ctime = tmpstatbuf.st_ctime;
+    } else {
 	retstat = lstat(fpath, statbuf);
-   
-    if (retstat != 0)
-	retstat = bb_error("bb_getattr lstat");
-    
+	if (retstat != 0) {
+	    retstat = bb_error("bb_getattr lstat");
+	    goto cleanup;
+	}
+    }
+
     log_stat(statbuf);
-    
+    retstat = 0;
+
+cleanup:
+    if (decompressed) {
+	ret = close(tmpfd);
+	if (ret)
+	    retstat = ret;
+
+	ret = unlink(tmpfilename);
+	if (ret)
+	    retstat = ret;
+
+	cache_remove(cache, path);
+    }
+    if (fd != -1)
+	close(fd);
+
     return retstat;
 }
 
@@ -961,18 +1020,45 @@ int bb_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
 // the path...
 int bb_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
-    int retstat = 0;
+    int retstat = 0, tmpfd;
+    las_cache_t *cache = BB_DATA->cache;
+    struct stat tmpstatbuf;
     
     log_msg("\nbb_fgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n",
 	    path, statbuf, fi);
     log_fi(fi);
-    
-    retstat = fstat(fi->fh, statbuf);
-    if (retstat < 0)
-	retstat = bb_error("bb_fgetattr fstat");
-    
+
+    if (is_lasfile(path)) {
+	/* File must have been already opened via open() */
+	retstat = cache_get(cache, path, NULL, &tmpfd);
+	assert(retstat == 0);
+	retstat = fstat(tmpfd, &tmpstatbuf);
+	if (retstat != 0) {
+	    retstat = bb_error("bb_fgetattr, tmpfd fstat");
+	    return retstat;
+	}
+
+	retstat = fstat(fi->fh, statbuf);
+	if (retstat < 0) {
+	    retstat = bb_error("bb_fgetattr fstat");
+	    return retstat;
+	}
+
+	/* Merge attributes to output statbuf */
+	statbuf->st_size = tmpstatbuf.st_size;
+	statbuf->st_atime = tmpstatbuf.st_atime;
+	statbuf->st_mtime = tmpstatbuf.st_mtime;
+	statbuf->st_ctime = tmpstatbuf.st_ctime;
+    } else {
+	retstat = fstat(fi->fh, statbuf);
+	if (retstat < 0) {
+	    retstat = bb_error("bb_fgetattr fstat");
+	    return retstat;
+	}
+    }
+
     log_stat(statbuf);
-    
+
     return retstat;
 }
 
