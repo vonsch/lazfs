@@ -39,6 +39,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/xattr.h>
+#include <liblas/capi/liblas.h>
 
 #include "log.h"
 #include "util.h"
@@ -364,25 +365,116 @@ int bb_utime(const char *path, struct utimbuf *ubuf)
 int bb_open(const char *path, struct fuse_file_info *fi)
 {
     int retstat = 0;
-    int fd;
-    char fpath[PATH_MAX];
+    int fd = -1, tmpfd = -1;
+    char fpath[PATH_MAX], fpath_laz[PATH_MAX];
+    char tmpfilename[] = "/tmp/lazfs.XXXXXX";
+    LASReaderH reader = NULL;
+    LASWriterH writer = NULL;
+    LASHeaderH wheader = NULL;
+    LASPointH p = NULL;
     
     log_msg("\nbb_open(path\"%s\", fi=0x%08x)\n",
 	    path, fi);
     bb_fullpath(fpath, path);
     
     if (is_lasfile(path)) {
-	/* Decompress .laz here */
-        /* Cache here */
+	/* We got request for .las file, open the .laz and decompress it */
+	strncpy(fpath_laz, fpath, PATH_MAX);
+	fpath_laz[PATH_MAX - 1] = '\0';
+	fpath_laz[strlen(fpath_laz) - 1] = 'z';
+
+	log_msg("\nbb_open - opening laz file \"%s\"\n", fpath_laz);
+
+	fd = open(fpath_laz, fi->flags);
+	if (fd < 0) {
+	    retstat = bb_error("bb_open open");
+	    goto cleanup;
+	}
+
+	tmpfd = mkstemp(tmpfilename);
+	if (tmpfd == -1) {
+	    retstat = bb_error("bb_open mkstemp");
+	    goto cleanup;
+	}
+
+	reader = LASReader_CreateFd(fd);
+	if (reader == NULL) {
+	    log_msg("    ERROR: LASReader_CreateFd failed: %s\n",
+		    LASError_GetLastErrorMsg());
+	    /* FIXME: We should return more codes */
+	    retstat = -ENOMEM;
+	    goto cleanup;
+	}
+
+	wheader = LASHeader_Copy(LASReader_GetHeader(reader));
+	if (wheader == NULL) {
+	    log_msg("    ERROR: LASHeader_Copy failed: %s\n",
+		    LASError_GetLastErrorMsg());
+	    /* FIXME: Return more codes? */
+	    retstat = -ENOMEM;
+	    goto cleanup;
+	}
+
+	if (LASHeader_SetCompressed(wheader, 0) != 0) {
+	    log_msg("    ERROR: LASHeader_SetCompressed failed: %s\n",
+		    LASError_GetLastErrorMsg());
+	    retstat = -ENOMEM; /* FIXME: What's more appropriate errno? */
+	    goto cleanup;
+	}
+
+	writer = LASWriter_CreateFd(tmpfd, wheader, LAS_MODE_WRITE);
+	if (writer == NULL) {
+	    log_msg("    ERROR: LASWriter_CreateFd failed: %s\n",
+		    LASError_GetLastErrorMsg());
+	    retstat = -ENOMEM;
+	    goto cleanup;
+	}
+
+	/* Decompress point-by-point */
+	p = LASReader_GetNextPoint(reader);
+	while (p) {
+	    if (LASWriter_WritePoint(writer, p) != LE_None) {
+		log_msg("    ERROR: LASWriter_WritePoint failed: %s\n",
+			LASError_GetLastErrorMsg());
+		/* FIXME: Is there more appropriate errno? */
+		retstat = -ENOSPC;
+		goto cleanup;
+	    }
+	    p = LASReader_GetNextPoint(reader);
+	}
+
+	LASWriter_Destroy(writer);
+	LASReader_Destroy(reader);
+	LASHeader_Destroy(wheader);
+
+	/* Cache opened file */
+    } else {
+	fd = open(fpath, fi->flags);
+	if (fd < 0) {
+	    retstat = bb_error("bb_open open");
+	    goto cleanup;
+	}
     }
 
-    fd = open(fpath, fi->flags);
-    if (fd < 0)
-	retstat = bb_error("bb_open open");
-    
     fi->fh = fd;
     log_fi(fi);
-    
+
+    return 0;
+
+cleanup:
+    if (writer != NULL)
+	LASWriter_Destroy(writer);
+    if (wheader != NULL)
+	LASHeader_Destroy(wheader);
+    if (reader != NULL)
+	LASReader_Destroy(reader);
+    if (tmpfd != -1) {
+	close(tmpfd);
+	unlink(tmpfilename);
+    }
+    if (fd != -1)
+	close(fd);
+
     return retstat;
 }
 
