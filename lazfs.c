@@ -76,12 +76,22 @@ int bb_getattr(const char *path, struct stat *statbuf)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
-    
+    char fpath_laz[PATH_MAX];
+
     log_msg("\nbb_getattr(path=\"%s\", statbuf=0x%08x)\n",
 	  path, statbuf);
     bb_fullpath(fpath, path);
-    
-    retstat = lstat(fpath, statbuf);
+
+    if (is_lasfile(path)) {
+        /* We got request for .las file */
+        strncpy(fpath_laz, fpath, PATH_MAX);
+        fpath_laz[PATH_MAX - 1] = '\0';
+        fpath_laz[strlen(fpath_laz) - 1] = 'z';
+
+	retstat = lstat(fpath_laz, statbuf);
+    } else
+	retstat = lstat(fpath, statbuf);
+   
     if (retstat != 0)
 	retstat = bb_error("bb_getattr lstat");
     
