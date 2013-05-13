@@ -1011,6 +1011,13 @@ int main(int argc, char *argv[])
 	abort();
     }
 
+    /* Initialize .las file cache */
+    bb_data->cache = NULL;
+    if (cache_create(&bb_data->cache) != 0) {
+	perror("Failed to create .las cache");
+	abort();
+    }
+
     // Pull the rootdir out of the argument list and save it in my
     // internal data
     bb_data->rootdir = realpath(argv[argc-2], NULL);
