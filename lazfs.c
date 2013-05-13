@@ -640,19 +640,35 @@ int bb_flush(const char *path, struct fuse_file_info *fi)
  */
 int bb_release(const char *path, struct fuse_file_info *fi)
 {
-    int retstat = 0;
+    int ret, retstat = 0;
+    char *tmpfilename;
+    int tmpfd;
+    las_cache_t *cache = BB_DATA->cache;
     
     log_msg("\nbb_release(path=\"%s\", fi=0x%08x)\n",
 	  path, fi);
     log_fi(fi);
 
     if (is_lasfile(path)) {
-	/* Remove file entry from cache */
+	retstat = cache_get(cache, path, &tmpfilename, &tmpfd);
+	assert(retstat == 0); /* This file must have been opened & cached */
+
+	ret = close(tmpfd);
+	if (ret)
+	    retstat = ret;
+
+	ret = unlink(tmpfilename);
+	if (ret)
+	    retstat = ret;
+
+	cache_remove(cache, path);
     }
 
     // We need to close the file.  Had we allocated any resources
     // (buffers etc) we'd need to free them here as well.
-    retstat = close(fi->fh);
+    ret = close(fi->fh);
+    if (ret)
+	retstat = ret;
     
     return retstat;
 }
