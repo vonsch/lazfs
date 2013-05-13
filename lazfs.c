@@ -620,6 +620,7 @@ int bb_release(const char *path, struct fuse_file_info *fi)
 {
     int ret, retstat = 0;
     char *tmpfilename;
+    char tmpfilename2[PATH_MAX];
     int tmpfd;
     las_cache_t *cache = BB_DATA->cache;
     
@@ -631,15 +632,19 @@ int bb_release(const char *path, struct fuse_file_info *fi)
 	retstat = cache_get(cache, path, &tmpfilename, &tmpfd);
 	assert(retstat == 0); /* This file must have been opened & cached */
 
+	/* Preserve tmpfilename because it gets destroyed after cache_remove */
+	strncpy(tmpfilename2, tmpfilename, PATH_MAX);
+
+	cache_remove(cache, path);
+
 	ret = close(tmpfd);
 	if (ret)
 	    retstat = ret;
 
-	ret = unlink(tmpfilename);
+	ret = unlink(tmpfilename2);
 	if (ret)
 	    retstat = ret;
 
-	cache_remove(cache, path);
     }
 
     // We need to close the file.  Had we allocated any resources
