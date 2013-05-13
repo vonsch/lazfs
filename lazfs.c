@@ -26,6 +26,7 @@
 
 #include "params.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -508,6 +509,8 @@ cleanup:
 int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     int retstat = 0;
+    int tmpfd = -1;
+    las_cache_t *cache = BB_DATA->cache;
     
     log_msg("\nbb_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 	    path, buf, size, offset, fi);
@@ -515,10 +518,13 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
     log_fi(fi);
 
     if (is_lasfile(path)) {
-        /* Get cached file here and read from it */
-    }
+	retstat = cache_get(cache, path, NULL, &tmpfd);
+	/* Every read file must have been opened & cached */
+	assert(retstat == 0);
+    } else
+	tmpfd = fi->fh;
 
-    retstat = pread(fi->fh, buf, size, offset);
+    retstat = pread(tmpfd, buf, size, offset);
     if (retstat < 0)
 	retstat = bb_error("bb_read read");
     
