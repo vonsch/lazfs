@@ -12,23 +12,23 @@
 
 /* All cache_* functions below returns -errno as errors */
 
-typedef struct las_cache las_cache_t;
+typedef struct laz_cache laz_cache_t;
 
 /* Creates and initializes file cache. Returns zero on success */
-int cache_create(las_cache_t **cachep);
+int cache_create(laz_cache_t **cachep);
 
 /* Destroys cache */
-void cache_destroy(las_cache_t **cachep);
+void cache_destroy(laz_cache_t **cachep);
 
 /* Adds existing decompressed file + it's open fd to cache */
-int cache_add(las_cache_t *cache, const char *filename,
+int cache_add(laz_cache_t *cache, const char *filename,
 	      const char *tmpfilename, int tmpfd);
 
 /* Removes file from cache */
-void cache_remove(las_cache_t *cache, const char *filename);
+void cache_remove(laz_cache_t *cache, const char *filename);
 
 /* Get item from cache. Returns zero if found. */
-int cache_get(las_cache_t *cache, const char *filename, char **tmpfilename,
+int cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
 	      int *tmpfd);
 
 #endif

@@ -77,7 +77,7 @@ decompress(const char *name, int fd)
     LASWriterH writer = NULL;
     LASHeaderH wheader = NULL;
     LASPointH p = NULL;
-    las_cache_t *cache = BB_DATA->cache;
+    laz_cache_t *cache = BB_DATA->cache;
     char tmpfilename[] = "/tmp/lazfs.XXXXXX";
     int tmpfd = -1;
     int retstat = 0;

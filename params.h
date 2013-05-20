@@ -28,7 +28,7 @@
 struct lazfs_state {
     FILE *logfile;
     char *rootdir;
-    las_cache_t *cache;
+    laz_cache_t *cache;
 };
 #define BB_DATA ((struct lazfs_state *) fuse_get_context()->private_data)
 

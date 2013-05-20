@@ -25,10 +25,10 @@ struct file_entry {
     LIST_ENTRY(file_entry) link;
 };
 
-typedef struct las_cache {
+typedef struct laz_cache {
     pthread_mutex_t lock;
     LIST_HEAD(file_entries, file_entry) entries;
-} las_cache_t;
+} laz_cache_t;
 
 static void
 file_entry_destroy(file_entry_t **entryp)
@@ -87,9 +87,9 @@ cleanup:
 }
 
 int
-cache_create(las_cache_t **cachep)
+cache_create(laz_cache_t **cachep)
 {
-    las_cache_t *cache;
+    laz_cache_t *cache;
     int ret;
 
     assert(cachep != NULL && *cachep == NULL);
@@ -108,9 +108,9 @@ cache_create(las_cache_t **cachep)
 }
 
 void
-cache_destroy(las_cache_t **cachep)
+cache_destroy(laz_cache_t **cachep)
 {
-    las_cache_t *cache;
+    laz_cache_t *cache;
     file_entry_t *entry;
     int ret;
 
@@ -132,7 +132,7 @@ cache_destroy(las_cache_t **cachep)
 }
 
 int
-cache_add(las_cache_t *cache, const char *filename, const char *tmpfilename,
+cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
 	  int tmpfd)
 {
     int err = 0;
@@ -154,7 +154,7 @@ cleanup:
 }
 
 void
-cache_remove(las_cache_t *cache, const char *filename)
+cache_remove(laz_cache_t *cache, const char *filename)
 {
     file_entry_t *entry;
 
@@ -181,7 +181,7 @@ cleanup:
 }
 
 int
-cache_get(las_cache_t *cache, const char *filename, char **tmpfilename,
+cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
 	  int *tmpfd)
 {
     file_entry_t *entry;
