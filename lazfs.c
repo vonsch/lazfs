@@ -1,29 +1,21 @@
 /*
-  Big Brother File System
-  Copyright (C) 2012 Joseph J. Pfeiffer, Jr., Ph.D. <pfeiffer@cs.nmsu.edu>
-  Copyright (C) 2013 Adam Tkac <vonsch@gmail.com>
-
-  This program can be distributed under the terms of the GNU GPLv3.
-  See the file COPYING.
-
-  This code is derived from function prototypes found /usr/include/fuse/fuse.h
-  Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
-  His code is licensed under the LGPLv2.
-  A copy of that code is included in the file fuse.h
-  
-  The point of this FUSE filesystem is to provide an introduction to
-  FUSE.  It was my first FUSE filesystem as I got to know the
-  software; hopefully, the comments in this code will help people who
-  follow later to get a gentler introduction.
-
-  This might be called a no-op filesystem:  it doesn't impose
-  filesystem semantics on top of any other existing structure.  It
-  simply reports the requests that come in, and passes them to an
-  underlying filesystem.  The information is saved in a logfile named
-  bbfs.log, in the directory from which you run bbfs.
-
-  gcc -Wall `pkg-config fuse --cflags --libs` -o bbfs bbfs.c
-*/
+ * LazFS filesystem
+ * Copyright (C) 2013 Adam Tkac <vonsch@gmail.com>
+ *
+ *
+ * Based on Big Brother File System:
+ * Copyright (C) 2012 Joseph J. Pfeiffer, Jr., Ph.D. <pfeiffer@cs.nmsu.edu>
+ * http://www.cs.nmsu.edu/~pfeiffer/fuse-tutorial
+ *
+ * This program can be distributed under the terms of the GNU GPLv3.
+ * See the file COPYING.
+ *
+ * This code is derived from function prototypes found /usr/include/fuse/fuse.h
+ * Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
+ * His code is licensed under the LGPLv2.
+ * A copy of that code is included in the file fuse.h
+ * 
+ */
 
 #include "params.h"
 
@@ -45,12 +37,8 @@
 #include "log.h"
 #include "util.h"
 
-///////////////////////////////////////////////////////////
-//
-// Prototypes for all these functions, and the C-style comments,
-// come indirectly from /usr/include/fuse.h
-//
-/** Get file attributes.
+/*
+ * Get file attributes.
  *
  * Similar to stat().  The 'st_dev' and 'st_blksize' fields are
  * ignored.  The 'st_ino' field is ignored except if the 'use_ino'
@@ -143,18 +131,20 @@ cleanup:
     return retstat;
 }
 
-/** Read the target of a symbolic link
+/*
+ * Read the target of a symbolic link
  *
  * The buffer should be filled with a null terminated string.  The
  * buffer size argument includes the space for the terminating
  * null character.  If the linkname is too long to fit in the
  * buffer, it should be truncated.  The return value should be 0
  * for success.
+ *
+ * Note the system readlink() will truncate and lose the terminating
+ * null.  So, the size passed to to the system readlink() must be one
+ * less than the size passed to bb_readlink()
+ * bb_readlink() code by Bernardo F Costa (thanks!)
  */
-// Note the system readlink() will truncate and lose the terminating
-// null.  So, the size passed to to the system readlink() must be one
-// less than the size passed to bb_readlink()
-// bb_readlink() code by Bernardo F Costa (thanks!)
 int bb_readlink(const char *path, char *link, size_t size)
 {
     int retstat = 0;
@@ -175,12 +165,14 @@ int bb_readlink(const char *path, char *link, size_t size)
     return retstat;
 }
 
-/** Create a file node
+/*
+ * Create a file node
  *
  * There is no create() operation, mknod() will be called for
  * creation of all non-directory, non-symlink nodes.
+ *
+ * FIXME: shouldn't that comment be "if" there is no.... ?
  */
-// shouldn't that comment be "if" there is no.... ?
 int bb_mknod(const char *path, mode_t mode, dev_t dev)
 {
     int retstat = 0;
@@ -215,7 +207,7 @@ int bb_mknod(const char *path, mode_t mode, dev_t dev)
     return retstat;
 }
 
-/** Create a directory */
+/* Create a directory */
 int bb_mkdir(const char *path, mode_t mode)
 {
     int retstat = 0;
@@ -232,7 +224,7 @@ int bb_mkdir(const char *path, mode_t mode)
     return retstat;
 }
 
-/** Remove a file */
+/* Remove a file */
 int bb_unlink(const char *path)
 {
     int retstat = 0;
@@ -249,7 +241,7 @@ int bb_unlink(const char *path)
     return retstat;
 }
 
-/** Remove a directory */
+/* Remove a directory */
 int bb_rmdir(const char *path)
 {
     int retstat = 0;
@@ -266,11 +258,13 @@ int bb_rmdir(const char *path)
     return retstat;
 }
 
-/** Create a symbolic link */
-// The parameters here are a little bit confusing, but do correspond
-// to the symlink() system call.  The 'path' is where the link points,
-// while the 'link' is the link itself.  So we need to leave the path
-// unaltered, but insert the link into the mounted directory.
+/* 
+ * Create a symbolic link
+ * The parameters here are a little bit confusing, but do correspond
+ * to the symlink() system call.  The 'path' is where the link points,
+ * while the 'link' is the link itself.  So we need to leave the path
+ * unaltered, but insert the link into the mounted directory.
+ */
 int bb_symlink(const char *path, const char *link)
 {
     int retstat = 0;
@@ -287,8 +281,7 @@ int bb_symlink(const char *path, const char *link)
     return retstat;
 }
 
-/** Rename a file */
-// both path and newpath are fs-relative
+/* Rename a file. Both path and newpath are fs-relative. */
 int bb_rename(const char *path, const char *newpath)
 {
     int retstat = 0;
@@ -307,7 +300,7 @@ int bb_rename(const char *path, const char *newpath)
     return retstat;
 }
 
-/** Create a hard link to a file */
+/* Create a hard link to a file */
 int bb_link(const char *path, const char *newpath)
 {
     int retstat = 0;
@@ -325,7 +318,7 @@ int bb_link(const char *path, const char *newpath)
     return retstat;
 }
 
-/** Change the permission bits of a file */
+/* Change the permission bits of a file */
 int bb_chmod(const char *path, mode_t mode)
 {
     int retstat = 0;
@@ -342,7 +335,7 @@ int bb_chmod(const char *path, mode_t mode)
     return retstat;
 }
 
-/** Change the owner and group of a file */
+/* Change the owner and group of a file */
 int bb_chown(const char *path, uid_t uid, gid_t gid)
   
 {
@@ -360,7 +353,7 @@ int bb_chown(const char *path, uid_t uid, gid_t gid)
     return retstat;
 }
 
-/** Change the size of a file */
+/* Change the size of a file */
 int bb_truncate(const char *path, off_t newsize)
 {
     int retstat = 0;
@@ -377,8 +370,10 @@ int bb_truncate(const char *path, off_t newsize)
     return retstat;
 }
 
-/** Change the access and/or modification times of a file */
-/* note -- I'll want to change this as soon as 2.6 is in debian testing */
+/*
+ * Change the access and/or modification times of a file
+ * Note: I'll want to change this as soon as 2.6 is in debian testing 
+ */
 int bb_utime(const char *path, struct utimbuf *ubuf)
 {
     int retstat = 0;
@@ -395,7 +390,8 @@ int bb_utime(const char *path, struct utimbuf *ubuf)
     return retstat;
 }
 
-/** File open operation
+/*
+ * File open operation
  *
  * No creation, or truncation flags (O_CREAT, O_EXCL, O_TRUNC)
  * will be passed to open().  Open should check if the operation
@@ -452,7 +448,8 @@ cleanup:
     return retstat;
 }
 
-/** Read data from an open file
+/*
+ * Read data from an open file
  *
  * Read should return exactly the number of bytes requested except
  * on EOF or error, otherwise the rest of the data will be
@@ -462,12 +459,14 @@ cleanup:
  * this operation.
  *
  * Changed in version 2.2
+ *
+ * Note:
+ * I don't fully understand the documentation above -- it doesn't
+ * match the documentation for the read() system call which says it
+ * can return with anything up to the amount of data requested. nor
+ * with the fusexmp code which returns the amount of data also
+ * returned by read.
  */
-// I don't fully understand the documentation above -- it doesn't
-// match the documentation for the read() system call which says it
-// can return with anything up to the amount of data requested. nor
-// with the fusexmp code which returns the amount of data also
-// returned by read.
 int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     int retstat = 0;
@@ -494,16 +493,19 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
     return retstat;
 }
 
-/** Write data to an open file
+/*
+ * Write data to an open file
  *
  * Write should return exactly the number of bytes requested
  * except on error.  An exception to this is when the 'direct_io'
  * mount option is specified (see read operation).
  *
  * Changed in version 2.2
+ *
+ * Note:
+ * As  with read(), the documentation above is inconsistent with the
+ * documentation for the write() system call.
  */
-// As  with read(), the documentation above is inconsistent with the
-// documentation for the write() system call.
 int bb_write(const char *path, const char *buf, size_t size, off_t offset,
 	     struct fuse_file_info *fi)
 {
@@ -527,7 +529,8 @@ int bb_write(const char *path, const char *buf, size_t size, off_t offset,
     return retstat;
 }
 
-/** Get file system statistics
+/*
+ * Get file system statistics
  *
  * The 'f_frsize', 'f_favail', 'f_fsid' and 'f_flag' fields are ignored
  *
@@ -553,7 +556,8 @@ int bb_statfs(const char *path, struct statvfs *statv)
     return retstat;
 }
 
-/** Possibly flush cached data
+/*
+ * Possibly flush cached data
  *
  * BIG NOTE: This is not equivalent to fsync().  It's not a
  * request to sync dirty data.
@@ -587,7 +591,8 @@ int bb_flush(const char *path, struct fuse_file_info *fi)
     return retstat;
 }
 
-/** Release an open file
+/*
+ * Release an open file
  *
  * Release is called when there are no more references to an open
  * file: all file descriptors are closed and all memory mappings
@@ -643,7 +648,8 @@ int bb_release(const char *path, struct fuse_file_info *fi)
     return retstat;
 }
 
-/** Synchronize file contents
+/*
+ * Synchronize file contents
  *
  * If the datasync parameter is non-zero, then only the user data
  * should be flushed, not the meta data.
@@ -669,7 +675,7 @@ int bb_fsync(const char *path, int datasync, struct fuse_file_info *fi)
     return retstat;
 }
 
-/** Set extended attributes */
+/* Set extended attributes */
 int bb_setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
 {
     int retstat = 0;
@@ -686,7 +692,7 @@ int bb_setxattr(const char *path, const char *name, const char *value, size_t si
     return retstat;
 }
 
-/** Get extended attributes */
+/* Get extended attributes */
 int bb_getxattr(const char *path, const char *name, char *value, size_t size)
 {
     int retstat = 0;
@@ -705,7 +711,7 @@ int bb_getxattr(const char *path, const char *name, char *value, size_t size)
     return retstat;
 }
 
-/** List extended attributes */
+/* List extended attributes */
 int bb_listxattr(const char *path, char *list, size_t size)
 {
     int retstat = 0;
@@ -727,7 +733,7 @@ int bb_listxattr(const char *path, char *list, size_t size)
     return retstat;
 }
 
-/** Remove extended attributes */
+/* Remove extended attributes */
 int bb_removexattr(const char *path, const char *name)
 {
     int retstat = 0;
@@ -744,7 +750,8 @@ int bb_removexattr(const char *path, const char *name)
     return retstat;
 }
 
-/** Open directory
+/*
+ * Open directory
  *
  * This method should check if the open operation is permitted for
  * this  directory
@@ -772,7 +779,8 @@ int bb_opendir(const char *path, struct fuse_file_info *fi)
     return retstat;
 }
 
-/** Read directory
+/*
+ * Read directory
  *
  * This supersedes the old getdir() interface.  New applications
  * should use this.
@@ -832,7 +840,8 @@ int bb_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset
     return retstat;
 }
 
-/** Release directory
+/*
+ * Release directory
  *
  * Introduced in version 2.3
  */
@@ -849,15 +858,18 @@ int bb_releasedir(const char *path, struct fuse_file_info *fi)
     return retstat;
 }
 
-/** Synchronize directory contents
+/*
+ * Synchronize directory contents
  *
  * If the datasync parameter is non-zero, then only the user data
  * should be flushed, not the meta data
  *
  * Introduced in version 2.3
+ *
+ * Note:
+ * When exactly is this called?  when a user calls fsync and it
+ * happens to be a directory?
  */
-// when exactly is this called?  when a user calls fsync and it
-// happens to be a directory? ???
 int bb_fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
 {
     int retstat = 0;
@@ -869,7 +881,8 @@ int bb_fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
     return retstat;
 }
 
-/**
+/*
+ *
  * Initialize filesystem
  *
  * The return value will passed in the private_data field of
@@ -878,14 +891,15 @@ int bb_fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
  *
  * Introduced in version 2.3
  * Changed in version 2.6
+ *
+ * Undocumented but extraordinarily useful fact:  the fuse_context is
+ * set up before this function is called, and
+ * fuse_get_context()->private_data returns the user_data passed to
+ * fuse_main().  Really seems like either it should be a third
+ * parameter coming in here, or else the fact should be documented
+ * (and this might as well return void, as it did in older versions of
+ * FUSE).
  */
-// Undocumented but extraordinarily useful fact:  the fuse_context is
-// set up before this function is called, and
-// fuse_get_context()->private_data returns the user_data passed to
-// fuse_main().  Really seems like either it should be a third
-// parameter coming in here, or else the fact should be documented
-// (and this might as well return void, as it did in older versions of
-// FUSE).
 void *bb_init(struct fuse_conn_info *conn)
 {
     
@@ -894,7 +908,7 @@ void *bb_init(struct fuse_conn_info *conn)
     return BB_DATA;
 }
 
-/**
+/*
  * Clean up filesystem
  *
  * Called on filesystem exit.
@@ -906,7 +920,7 @@ void bb_destroy(void *userdata)
     log_debug("\nbb_destroy(userdata=0x%08x)\n", userdata);
 }
 
-/**
+/*
  * Check file access permissions
  *
  * This will be called for the access() system call.  If the
@@ -934,7 +948,7 @@ int bb_access(const char *path, int mask)
     return retstat;
 }
 
-/**
+/*
  * Create and open a file
  *
  * If the file does not exist, first create it with the specified
@@ -967,7 +981,7 @@ int bb_create(const char *path, mode_t mode, struct fuse_file_info *fi)
     return retstat;
 }
 
-/**
+/*
  * Change the size of an open file
  *
  * This method is called instead of the truncate() method if the
@@ -994,7 +1008,7 @@ int bb_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
     return retstat;
 }
 
-/**
+/*
  * Get attributes from an open file
  *
  * This method is called instead of the getattr() method if the
@@ -1005,10 +1019,11 @@ int bb_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
  * invocations of fstat() too.
  *
  * Introduced in version 2.5
+ *
+ * Since it's currently only called after bb_create(), and bb_create()
+ * opens the file, I ought to be able to just use the fd and ignore
+ * the path...
  */
-// Since it's currently only called after bb_create(), and bb_create()
-// opens the file, I ought to be able to just use the fd and ignore
-// the path...
 int bb_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
     int retstat = 0, tmpfd;
