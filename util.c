@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 char
-exec_hooks(const char *fpath)
+lazfs_exec_hooks(const char *fpath)
 {
 	size_t len;
 	int ret;
@@ -72,7 +72,7 @@ lazfs_error(const char *str)
 }
 
 int
-decompress(const char *name, int fd)
+lazfs_decompress(const char *name, int fd)
 {
 	LASReaderH reader = NULL;
 	LASWriterH writer = NULL;

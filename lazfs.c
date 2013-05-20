@@ -60,7 +60,7 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 		  path, statbuf);
 	lazfs_fullpath(fpath, path);
 
-	if (exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath)) {
 		/* We got request for .las file */
 		strncpy(fpath_laz, fpath, PATH_MAX);
 		fpath_laz[PATH_MAX - 1] = '\0';
@@ -82,7 +82,7 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 			goto cleanup;
 		}
 
-		retstat = decompress(path, fd);
+		retstat = lazfs_decompress(path, fd);
 		if (retstat != 0) {
 			log_error("    ERROR: lazfs_getattr: decompress failed");
 			goto cleanup;
@@ -424,7 +424,7 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 		  path, fi);
 	lazfs_fullpath(fpath, path);
 
-	if (exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath)) {
 		/* We got request for .las file */
 		strncpy(fpath_laz, fpath, PATH_MAX);
 		fpath_laz[PATH_MAX - 1] = '\0';
@@ -438,7 +438,7 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 			goto cleanup;
 		}
 
-		retstat = decompress(path, fd);
+		retstat = lazfs_decompress(path, fd);
 		if (retstat != 0)
 			goto cleanup;
 	} else {
@@ -493,7 +493,7 @@ lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 	log_fi(fi);
 	lazfs_fullpath(fpath, path);
 
-	if (exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath)) {
 		retstat = cache_get(cache, path, NULL, &tmpfd);
 		/* Every read file must have been opened & cached */
 		assert(retstat == 0);
@@ -532,7 +532,7 @@ lazfs_write(const char *path, const char *buf, size_t size, off_t offset,
 	log_fi(fi);
 	lazfs_fullpath(fpath, path);
 
-	if (exec_hooks(path)) {
+	if (lazfs_exec_hooks(path)) {
 		/* We don't support writting, yet */
 		return -ENOSYS;
 	}
@@ -638,7 +638,7 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 	log_fi(fi);
 	lazfs_fullpath(fpath, path);
 
-	if (exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath)) {
 		retstat = cache_get(cache, path, &tmpfilename, &tmpfd);
 		assert(retstat == 0); /* This file must have been opened & cached */
 
@@ -1066,7 +1066,7 @@ lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi
 	log_fi(fi);
 	lazfs_fullpath(fpath, path);
 
-	if (exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath)) {
 		/* File must have been already opened via open() */
 		retstat = cache_get(cache, path, NULL, &tmpfd);
 		assert(retstat == 0);
