@@ -22,26 +22,26 @@
 char
 exec_hooks(const char *fpath)
 {
-    size_t len;
-    int ret;
-    const char *laz_suffix;
-    struct stat stbuf;
+	size_t len;
+	int ret;
+	const char *laz_suffix;
+	struct stat stbuf;
 
-    /* Don't exec hooks if requested file exists */
-    ret = lstat(fpath, &stbuf);
-    if (ret == 0)
+	/* Don't exec hooks if requested file exists */
+	ret = lstat(fpath, &stbuf);
+	if (ret == 0)
+		return 0;
+
+	len = strlen(fpath);
+	if (len < 4)
+		return 0;
+
+	laz_suffix = fpath + len - 4;
+	assert(laz_suffix >= fpath);
+	if (strncmp(laz_suffix, ".las", 4) == 0)
+		return 1;
+
 	return 0;
-
-    len = strlen(fpath);
-    if (len < 4)
-	return 0;
-
-    laz_suffix = fpath + len - 4;
-    assert(laz_suffix >= fpath);
-    if (strncmp(laz_suffix, ".las", 4) == 0)
-	return 1;
-
-    return 0;
 }
 
 /*
@@ -51,119 +51,120 @@ exec_hooks(const char *fpath)
  * whenever I need a path for something I'll call this to construct
  * it.
  */
-void lazfs_fullpath(char fpath[PATH_MAX], const char *path)
+void
+lazfs_fullpath(char fpath[PATH_MAX], const char *path)
 {
-    strcpy(fpath, BB_DATA->rootdir);
-    strncat(fpath, path, PATH_MAX); /* FIXME: long paths will break here */
+	strcpy(fpath, BB_DATA->rootdir);
+	strncat(fpath, path, PATH_MAX); /* FIXME: long paths will break here */
 
-    log_debug("    lazfs_fullpath:  rootdir = \"%s\", path = \"%s\", fpath = \"%s\"\n",
-	      BB_DATA->rootdir, path, fpath);
+	log_debug("    lazfs_fullpath:  rootdir = \"%s\", path = \"%s\", fpath = \"%s\"\n",
+		  BB_DATA->rootdir, path, fpath);
 }
 
 int
 lazfs_error(const char *str)
 {
-    int ret = -errno;
+	int ret = -errno;
 
-    log_error("    ERROR %s: %s\n", str, strerror(errno));
+	log_error("    ERROR %s: %s\n", str, strerror(errno));
 
-    return ret;
+	return ret;
 }
 
 int
 decompress(const char *name, int fd)
 {
-    LASReaderH reader = NULL;
-    LASWriterH writer = NULL;
-    LASHeaderH wheader = NULL;
-    LASPointH p = NULL;
-    laz_cache_t *cache = BB_DATA->cache;
-    char tmpfilename[] = "/tmp/lazfs.XXXXXX";
-    int tmpfd = -1;
-    int retstat = 0;
+	LASReaderH reader = NULL;
+	LASWriterH writer = NULL;
+	LASHeaderH wheader = NULL;
+	LASPointH p = NULL;
+	laz_cache_t *cache = BB_DATA->cache;
+	char tmpfilename[] = "/tmp/lazfs.XXXXXX";
+	int tmpfd = -1;
+	int retstat = 0;
 
-    log_debug("\ndecompressing file \"%s\"\n", name);
+	log_debug("\ndecompressing file \"%s\"\n", name);
 
-    /* Check if we already decompressed it */
-    if (cache_get(cache, name, NULL, &tmpfd) == 0)
+	/* Check if we already decompressed it */
+	if (cache_get(cache, name, NULL, &tmpfd) == 0)
+		return 0;
+
+	tmpfd = mkstemp(tmpfilename);
+	if (tmpfd == -1) {
+		lazfs_error("decompress mkstemp");
+		goto cleanup;
+	}
+
+	reader = LASReader_CreateFd(fd);
+	if (reader == NULL) {
+		log_error("    ERROR: LASReader_CreateFd failed: %s\n",
+		LASError_GetLastErrorMsg());
+		/* FIXME: We should return more codes */
+		retstat = -ENOMEM;
+		goto cleanup;
+	}
+
+	wheader = LASHeader_Copy(LASReader_GetHeader(reader));
+	if (wheader == NULL) {
+		log_error("    ERROR: LASHeader_Copy failed: %s\n",
+		LASError_GetLastErrorMsg());
+		/* FIXME: Return more codes? */
+		retstat = -ENOMEM;
+		goto cleanup;
+	}
+
+	if (LASHeader_SetCompressed(wheader, 0) != 0) {
+		log_error("    ERROR: LASHeader_SetCompressed failed: %s\n",
+		LASError_GetLastErrorMsg());
+		retstat = -ENOMEM; /* FIXME: What's more appropriate errno? */
+		goto cleanup;
+	}
+
+	writer = LASWriter_CreateFd(tmpfd, wheader, LAS_MODE_WRITE);
+	if (writer == NULL) {
+		log_error("    ERROR: LASWriter_CreateFd failed: %s\n",
+		LASError_GetLastErrorMsg());
+		retstat = -ENOMEM;
+		goto cleanup;
+	}
+
+	/* Decompress point-by-point */
+	p = LASReader_GetNextPoint(reader);
+	while (p) {
+		if (LASWriter_WritePoint(writer, p) != LE_None) {
+			log_error("    ERROR: LASWriter_WritePoint failed: %s\n",
+			LASError_GetLastErrorMsg());
+			/* FIXME: Is there more appropriate errno? */
+			retstat = -ENOSPC;
+			goto cleanup;
+		}
+		p = LASReader_GetNextPoint(reader);
+	}
+
+	LASWriter_Destroy(writer);
+	LASReader_Destroy(reader);
+	LASHeader_Destroy(wheader);
+
+	/* Cache that this .laz file is already decompressed */
+	retstat = cache_add(cache, name, tmpfilename, tmpfd);
+	if (retstat != 0) {
+		log_error("    ERROR: lazfs_open - cache_add failed\n");
+		goto cleanup;
+	}
+
 	return 0;
 
-    tmpfd = mkstemp(tmpfilename);
-    if (tmpfd == -1) {
-	lazfs_error("decompress mkstemp");
-	goto cleanup;
-    }
-
-    reader = LASReader_CreateFd(fd);
-    if (reader == NULL) {
-	log_error("    ERROR: LASReader_CreateFd failed: %s\n",
-		LASError_GetLastErrorMsg());
-	/* FIXME: We should return more codes */
-	retstat = -ENOMEM;
-	goto cleanup;
-    }
-
-    wheader = LASHeader_Copy(LASReader_GetHeader(reader));
-    if (wheader == NULL) {
-	log_error("    ERROR: LASHeader_Copy failed: %s\n",
-		LASError_GetLastErrorMsg());
-	/* FIXME: Return more codes? */
-	retstat = -ENOMEM;
-	goto cleanup;
-    }
-
-    if (LASHeader_SetCompressed(wheader, 0) != 0) {
-	log_error("    ERROR: LASHeader_SetCompressed failed: %s\n",
-	LASError_GetLastErrorMsg());
-	retstat = -ENOMEM; /* FIXME: What's more appropriate errno? */
-	goto cleanup;
-    }
-
-    writer = LASWriter_CreateFd(tmpfd, wheader, LAS_MODE_WRITE);
-    if (writer == NULL) {
-	log_error("    ERROR: LASWriter_CreateFd failed: %s\n",
-	LASError_GetLastErrorMsg());
-	retstat = -ENOMEM;
-	goto cleanup;
-    }
-
-    /* Decompress point-by-point */
-    p = LASReader_GetNextPoint(reader);
-    while (p) {
-	if (LASWriter_WritePoint(writer, p) != LE_None) {
-	    log_error("    ERROR: LASWriter_WritePoint failed: %s\n",
-		     LASError_GetLastErrorMsg());
-	    /* FIXME: Is there more appropriate errno? */
-	    retstat = -ENOSPC;
-	    goto cleanup;
-	}
-	p = LASReader_GetNextPoint(reader);
-    }
-
-    LASWriter_Destroy(writer);
-    LASReader_Destroy(reader);
-    LASHeader_Destroy(wheader);
-
-    /* Cache that this .laz file is already decompressed */
-    retstat = cache_add(cache, name, tmpfilename, tmpfd);
-    if (retstat != 0) {
-	log_error("    ERROR: lazfs_open - cache_add failed\n");
-	goto cleanup;
-    }
-
-    return 0;
-
 cleanup:
-    if (writer != NULL)
-        LASWriter_Destroy(writer);
-    if (wheader != NULL)
-        LASHeader_Destroy(wheader);
-    if (reader != NULL)
-        LASReader_Destroy(reader);
-    if (tmpfd != -1) {
-        close(tmpfd);
-        unlink(tmpfilename);
-    }
+	if (writer != NULL)
+		LASWriter_Destroy(writer);
+	if (wheader != NULL)
+		LASHeader_Destroy(wheader);
+	if (reader != NULL)
+		LASReader_Destroy(reader);
+	if (tmpfd != -1) {
+		close(tmpfd);
+		unlink(tmpfilename);
+	}
 
-    return retstat;
+	return retstat;
 }
