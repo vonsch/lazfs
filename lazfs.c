@@ -44,7 +44,7 @@
  * ignored.  The 'st_ino' field is ignored except if the 'use_ino'
  * mount option is given.
  */
-int bb_getattr(const char *path, struct stat *statbuf)
+int lazfs_getattr(const char *path, struct stat *statbuf)
 {
     int retstat = 0, ret;
     char fpath[PATH_MAX];
@@ -55,9 +55,9 @@ int bb_getattr(const char *path, struct stat *statbuf)
     las_cache_t *cache = BB_DATA->cache;
     struct stat tmpstatbuf;
 
-    log_debug("\nbb_getattr(path=\"%s\", statbuf=0x%08x)\n",
+    log_debug("\nlazfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
 	      path, statbuf);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
 
     if (exec_hooks(fpath)) {
         /* We got request for .las file */
@@ -67,7 +67,7 @@ int bb_getattr(const char *path, struct stat *statbuf)
 
 	retstat = lstat(fpath_laz, statbuf);
 	if (retstat != 0) {
-	    retstat = bb_error("bb_getattr lstat");
+	    retstat = lazfs_error("lazfs_getattr lstat");
 	    goto cleanup;
 	}
 
@@ -77,13 +77,13 @@ int bb_getattr(const char *path, struct stat *statbuf)
 	/* We must decompress file to get it's length, sigh */
         fd = open(fpath_laz, O_RDONLY);
         if (fd < 0) {
-            retstat = bb_error("bb_getattr open");
+            retstat = lazfs_error("lazfs_getattr open");
             goto cleanup;
         }
 
         retstat = decompress(path, fd);
         if (retstat != 0) {
-	    log_error("    ERROR: bb_getattr: decompress failed");
+	    log_error("    ERROR: lazfs_getattr: decompress failed");
             goto cleanup;
 	} else {
 	    decompressed = 1;
@@ -93,7 +93,7 @@ int bb_getattr(const char *path, struct stat *statbuf)
 cached:
 	retstat = lstat(tmpfilename, &tmpstatbuf);
 	if (retstat != 0) {
-	    retstat = bb_error("bb_getattr tmpfile lstat");
+	    retstat = lazfs_error("lazfs_getattr tmpfile lstat");
 	    goto cleanup;
 	}
 
@@ -105,7 +105,7 @@ cached:
     } else {
 	retstat = lstat(fpath, statbuf);
 	if (retstat != 0) {
-	    retstat = bb_error("bb_getattr lstat");
+	    retstat = lazfs_error("lazfs_getattr lstat");
 	    goto cleanup;
 	}
     }
@@ -142,21 +142,21 @@ cleanup:
  *
  * Note the system readlink() will truncate and lose the terminating
  * null.  So, the size passed to to the system readlink() must be one
- * less than the size passed to bb_readlink()
- * bb_readlink() code by Bernardo F Costa (thanks!)
+ * less than the size passed to lazfs_readlink()
+ * lazfs_readlink() code by Bernardo F Costa (thanks!)
  */
-int bb_readlink(const char *path, char *link, size_t size)
+int lazfs_readlink(const char *path, char *link, size_t size)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("bb_readlink(path=\"%s\", link=\"%s\", size=%d)\n",
+    log_debug("lazfs_readlink(path=\"%s\", link=\"%s\", size=%d)\n",
 	      path, link, size);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = readlink(fpath, link, size - 1);
     if (retstat < 0)
-	retstat = bb_error("bb_readlink readlink");
+	retstat = lazfs_error("lazfs_readlink readlink");
     else  {
 	link[retstat] = '\0';
 	retstat = 0;
@@ -173,87 +173,87 @@ int bb_readlink(const char *path, char *link, size_t size)
  *
  * FIXME: shouldn't that comment be "if" there is no.... ?
  */
-int bb_mknod(const char *path, mode_t mode, dev_t dev)
+int lazfs_mknod(const char *path, mode_t mode, dev_t dev)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_mknod(path=\"%s\", mode=0%3o, dev=%lld)\n",
+    log_debug("\nlazfs_mknod(path=\"%s\", mode=0%3o, dev=%lld)\n",
 	      path, mode, dev);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     // On Linux this could just be 'mknod(path, mode, rdev)' but this
     //  is more portable
     if (S_ISREG(mode)) {
         retstat = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
 	if (retstat < 0)
-	    retstat = bb_error("bb_mknod open");
+	    retstat = lazfs_error("lazfs_mknod open");
         else {
             retstat = close(retstat);
 	    if (retstat < 0)
-		retstat = bb_error("bb_mknod close");
+		retstat = lazfs_error("lazfs_mknod close");
 	}
     } else
 	if (S_ISFIFO(mode)) {
 	    retstat = mkfifo(fpath, mode);
 	    if (retstat < 0)
-		retstat = bb_error("bb_mknod mkfifo");
+		retstat = lazfs_error("lazfs_mknod mkfifo");
 	} else {
 	    retstat = mknod(fpath, mode, dev);
 	    if (retstat < 0)
-		retstat = bb_error("bb_mknod mknod");
+		retstat = lazfs_error("lazfs_mknod mknod");
 	}
     
     return retstat;
 }
 
 /* Create a directory */
-int bb_mkdir(const char *path, mode_t mode)
+int lazfs_mkdir(const char *path, mode_t mode)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_mkdir(path=\"%s\", mode=0%3o)\n",
+    log_debug("\nlazfs_mkdir(path=\"%s\", mode=0%3o)\n",
 	      path, mode);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = mkdir(fpath, mode);
     if (retstat < 0)
-	retstat = bb_error("bb_mkdir mkdir");
+	retstat = lazfs_error("lazfs_mkdir mkdir");
     
     return retstat;
 }
 
 /* Remove a file */
-int bb_unlink(const char *path)
+int lazfs_unlink(const char *path)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("bb_unlink(path=\"%s\")\n",
+    log_debug("lazfs_unlink(path=\"%s\")\n",
 	      path);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = unlink(fpath);
     if (retstat < 0)
-	retstat = bb_error("bb_unlink unlink");
+	retstat = lazfs_error("lazfs_unlink unlink");
     
     return retstat;
 }
 
 /* Remove a directory */
-int bb_rmdir(const char *path)
+int lazfs_rmdir(const char *path)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("bb_rmdir(path=\"%s\")\n",
+    log_debug("lazfs_rmdir(path=\"%s\")\n",
 	      path);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = rmdir(fpath);
     if (retstat < 0)
-	retstat = bb_error("bb_rmdir rmdir");
+	retstat = lazfs_error("lazfs_rmdir rmdir");
     
     return retstat;
 }
@@ -265,107 +265,107 @@ int bb_rmdir(const char *path)
  * while the 'link' is the link itself.  So we need to leave the path
  * unaltered, but insert the link into the mounted directory.
  */
-int bb_symlink(const char *path, const char *link)
+int lazfs_symlink(const char *path, const char *link)
 {
     int retstat = 0;
     char flink[PATH_MAX];
     
-    log_debug("\nbb_symlink(path=\"%s\", link=\"%s\")\n",
+    log_debug("\nlazfs_symlink(path=\"%s\", link=\"%s\")\n",
 	      path, link);
-    bb_fullpath(flink, link);
+    lazfs_fullpath(flink, link);
     
     retstat = symlink(path, flink);
     if (retstat < 0)
-	retstat = bb_error("bb_symlink symlink");
+	retstat = lazfs_error("lazfs_symlink symlink");
     
     return retstat;
 }
 
 /* Rename a file. Both path and newpath are fs-relative. */
-int bb_rename(const char *path, const char *newpath)
+int lazfs_rename(const char *path, const char *newpath)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     char fnewpath[PATH_MAX];
     
-    log_debug("\nbb_rename(fpath=\"%s\", newpath=\"%s\")\n",
+    log_debug("\nlazfs_rename(fpath=\"%s\", newpath=\"%s\")\n",
 	      path, newpath);
-    bb_fullpath(fpath, path);
-    bb_fullpath(fnewpath, newpath);
+    lazfs_fullpath(fpath, path);
+    lazfs_fullpath(fnewpath, newpath);
     
     retstat = rename(fpath, fnewpath);
     if (retstat < 0)
-	retstat = bb_error("bb_rename rename");
+	retstat = lazfs_error("lazfs_rename rename");
     
     return retstat;
 }
 
 /* Create a hard link to a file */
-int bb_link(const char *path, const char *newpath)
+int lazfs_link(const char *path, const char *newpath)
 {
     int retstat = 0;
     char fpath[PATH_MAX], fnewpath[PATH_MAX];
     
-    log_debug("\nbb_link(path=\"%s\", newpath=\"%s\")\n",
+    log_debug("\nlazfs_link(path=\"%s\", newpath=\"%s\")\n",
 	      path, newpath);
-    bb_fullpath(fpath, path);
-    bb_fullpath(fnewpath, newpath);
+    lazfs_fullpath(fpath, path);
+    lazfs_fullpath(fnewpath, newpath);
     
     retstat = link(fpath, fnewpath);
     if (retstat < 0)
-	retstat = bb_error("bb_link link");
+	retstat = lazfs_error("lazfs_link link");
     
     return retstat;
 }
 
 /* Change the permission bits of a file */
-int bb_chmod(const char *path, mode_t mode)
+int lazfs_chmod(const char *path, mode_t mode)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_chmod(fpath=\"%s\", mode=0%03o)\n",
+    log_debug("\nlazfs_chmod(fpath=\"%s\", mode=0%03o)\n",
 	      path, mode);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = chmod(fpath, mode);
     if (retstat < 0)
-	retstat = bb_error("bb_chmod chmod");
+	retstat = lazfs_error("lazfs_chmod chmod");
     
     return retstat;
 }
 
 /* Change the owner and group of a file */
-int bb_chown(const char *path, uid_t uid, gid_t gid)
+int lazfs_chown(const char *path, uid_t uid, gid_t gid)
   
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_chown(path=\"%s\", uid=%d, gid=%d)\n",
+    log_debug("\nlazfs_chown(path=\"%s\", uid=%d, gid=%d)\n",
 	      path, uid, gid);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = chown(fpath, uid, gid);
     if (retstat < 0)
-	retstat = bb_error("bb_chown chown");
+	retstat = lazfs_error("lazfs_chown chown");
     
     return retstat;
 }
 
 /* Change the size of a file */
-int bb_truncate(const char *path, off_t newsize)
+int lazfs_truncate(const char *path, off_t newsize)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_truncate(path=\"%s\", newsize=%lld)\n",
+    log_debug("\nlazfs_truncate(path=\"%s\", newsize=%lld)\n",
 	      path, newsize);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = truncate(fpath, newsize);
     if (retstat < 0)
-	bb_error("bb_truncate truncate");
+	lazfs_error("lazfs_truncate truncate");
     
     return retstat;
 }
@@ -374,18 +374,18 @@ int bb_truncate(const char *path, off_t newsize)
  * Change the access and/or modification times of a file
  * Note: I'll want to change this as soon as 2.6 is in debian testing 
  */
-int bb_utime(const char *path, struct utimbuf *ubuf)
+int lazfs_utime(const char *path, struct utimbuf *ubuf)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_utime(path=\"%s\", ubuf=0x%08x)\n",
+    log_debug("\nlazfs_utime(path=\"%s\", ubuf=0x%08x)\n",
 	      path, ubuf);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = utime(fpath, ubuf);
     if (retstat < 0)
-	retstat = bb_error("bb_utime utime");
+	retstat = lazfs_error("lazfs_utime utime");
     
     return retstat;
 }
@@ -401,15 +401,15 @@ int bb_utime(const char *path, struct utimbuf *ubuf)
  *
  * Changed in version 2.2
  */
-int bb_open(const char *path, struct fuse_file_info *fi)
+int lazfs_open(const char *path, struct fuse_file_info *fi)
 {
     int retstat = 0;
     int fd = -1;
     char fpath[PATH_MAX], fpath_laz[PATH_MAX];
     
-    log_debug("\nbb_open(path\"%s\", fi=0x%08x)\n",
+    log_debug("\nlazfs_open(path\"%s\", fi=0x%08x)\n",
 	      path, fi);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     if (exec_hooks(fpath)) {
 	/* We got request for .las file */
@@ -417,11 +417,11 @@ int bb_open(const char *path, struct fuse_file_info *fi)
 	fpath_laz[PATH_MAX - 1] = '\0';
 	fpath_laz[strlen(fpath_laz) - 1] = 'z';
 
-	log_debug("\nbb_open - opening laz file \"%s\"\n", fpath_laz);
+	log_debug("\nlazfs_open - opening laz file \"%s\"\n", fpath_laz);
 
 	fd = open(fpath_laz, fi->flags);
 	if (fd < 0) {
-	    retstat = bb_error("bb_open open");
+	    retstat = lazfs_error("lazfs_open open");
 	    goto cleanup;
 	}
 
@@ -431,7 +431,7 @@ int bb_open(const char *path, struct fuse_file_info *fi)
     } else {
 	fd = open(fpath, fi->flags);
 	if (fd < 0) {
-	    retstat = bb_error("bb_open open");
+	    retstat = lazfs_error("lazfs_open open");
 	    goto cleanup;
 	}
     }
@@ -467,17 +467,17 @@ cleanup:
  * with the fusexmp code which returns the amount of data also
  * returned by read.
  */
-int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
+int lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     int retstat = 0;
     int tmpfd = -1;
     las_cache_t *cache = BB_DATA->cache;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
+    log_debug("\nlazfs_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 	      path, buf, size, offset, fi);
     log_fi(fi);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
 
     if (exec_hooks(fpath)) {
 	retstat = cache_get(cache, path, NULL, &tmpfd);
@@ -488,7 +488,7 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
 
     retstat = pread(tmpfd, buf, size, offset);
     if (retstat < 0)
-	retstat = bb_error("bb_read read");
+	retstat = lazfs_error("lazfs_read read");
     
     return retstat;
 }
@@ -506,16 +506,16 @@ int bb_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_
  * As  with read(), the documentation above is inconsistent with the
  * documentation for the write() system call.
  */
-int bb_write(const char *path, const char *buf, size_t size, off_t offset,
+int lazfs_write(const char *path, const char *buf, size_t size, off_t offset,
 	     struct fuse_file_info *fi)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
+    log_debug("\nlazfs_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 	      path, buf, size, offset, fi);
     log_fi(fi);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
 	
     if (exec_hooks(path)) {
 	/* We don't support writting, yet */
@@ -524,7 +524,7 @@ int bb_write(const char *path, const char *buf, size_t size, off_t offset,
 
     retstat = pwrite(fi->fh, buf, size, offset);
     if (retstat < 0)
-	retstat = bb_error("bb_write pwrite");
+	retstat = lazfs_error("lazfs_write pwrite");
     
     return retstat;
 }
@@ -537,19 +537,19 @@ int bb_write(const char *path, const char *buf, size_t size, off_t offset,
  * Replaced 'struct statfs' parameter with 'struct statvfs' in
  * version 2.5
  */
-int bb_statfs(const char *path, struct statvfs *statv)
+int lazfs_statfs(const char *path, struct statvfs *statv)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_statfs(path=\"%s\", statv=0x%08x)\n",
+    log_debug("\nlazfs_statfs(path=\"%s\", statv=0x%08x)\n",
 	      path, statv);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     // get stats for underlying filesystem
     retstat = statvfs(fpath, statv);
     if (retstat < 0)
-	retstat = bb_error("bb_statfs statvfs");
+	retstat = lazfs_error("lazfs_statfs statvfs");
     
     log_statvfs(statv);
     
@@ -580,11 +580,11 @@ int bb_statfs(const char *path, struct statvfs *statv)
  *
  * Changed in version 2.2
  */
-int bb_flush(const char *path, struct fuse_file_info *fi)
+int lazfs_flush(const char *path, struct fuse_file_info *fi)
 {
     int retstat = 0;
     
-    log_debug("\nbb_flush(path=\"%s\", fi=0x%08x)\n", path, fi);
+    log_debug("\nlazfs_flush(path=\"%s\", fi=0x%08x)\n", path, fi);
     // no need to get fpath on this one, since I work from fi->fh not the path
     log_fi(fi);
 	
@@ -606,7 +606,7 @@ int bb_flush(const char *path, struct fuse_file_info *fi)
  *
  * Changed in version 2.2
  */
-int bb_release(const char *path, struct fuse_file_info *fi)
+int lazfs_release(const char *path, struct fuse_file_info *fi)
 {
     int ret, retstat = 0;
     char *tmpfilename;
@@ -615,10 +615,10 @@ int bb_release(const char *path, struct fuse_file_info *fi)
     las_cache_t *cache = BB_DATA->cache;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_release(path=\"%s\", fi=0x%08x)\n",
+    log_debug("\nlazfs_release(path=\"%s\", fi=0x%08x)\n",
 	      path, fi);
     log_fi(fi);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
 
     if (exec_hooks(fpath)) {
 	retstat = cache_get(cache, path, &tmpfilename, &tmpfd);
@@ -656,11 +656,11 @@ int bb_release(const char *path, struct fuse_file_info *fi)
  *
  * Changed in version 2.2
  */
-int bb_fsync(const char *path, int datasync, struct fuse_file_info *fi)
+int lazfs_fsync(const char *path, int datasync, struct fuse_file_info *fi)
 {
     int retstat = 0;
     
-    log_debug("\nbb_fsync(path=\"%s\", datasync=%d, fi=0x%08x)\n",
+    log_debug("\nlazfs_fsync(path=\"%s\", datasync=%d, fi=0x%08x)\n",
 	      path, datasync, fi);
     log_fi(fi);
     
@@ -670,41 +670,41 @@ int bb_fsync(const char *path, int datasync, struct fuse_file_info *fi)
 	retstat = fsync(fi->fh);
     
     if (retstat < 0)
-	bb_error("bb_fsync fsync");
+	lazfs_error("lazfs_fsync fsync");
     
     return retstat;
 }
 
 /* Set extended attributes */
-int bb_setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
+int lazfs_setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_setxattr(path=\"%s\", name=\"%s\", value=\"%s\", size=%d, flags=0x%08x)\n",
+    log_debug("\nlazfs_setxattr(path=\"%s\", name=\"%s\", value=\"%s\", size=%d, flags=0x%08x)\n",
 	      path, name, value, size, flags);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = lsetxattr(fpath, name, value, size, flags);
     if (retstat < 0)
-	retstat = bb_error("bb_setxattr lsetxattr");
+	retstat = lazfs_error("lazfs_setxattr lsetxattr");
     
     return retstat;
 }
 
 /* Get extended attributes */
-int bb_getxattr(const char *path, const char *name, char *value, size_t size)
+int lazfs_getxattr(const char *path, const char *name, char *value, size_t size)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_getxattr(path = \"%s\", name = \"%s\", value = 0x%08x, size = %d)\n",
+    log_debug("\nlazfs_getxattr(path = \"%s\", name = \"%s\", value = 0x%08x, size = %d)\n",
 	      path, name, value, size);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = lgetxattr(fpath, name, value, size);
     if (retstat < 0)
-	retstat = bb_error("bb_getxattr lgetxattr");
+	retstat = lazfs_error("lazfs_getxattr lgetxattr");
     else
 	log_debug("    value = \"%s\"\n", value);
     
@@ -712,19 +712,19 @@ int bb_getxattr(const char *path, const char *name, char *value, size_t size)
 }
 
 /* List extended attributes */
-int bb_listxattr(const char *path, char *list, size_t size)
+int lazfs_listxattr(const char *path, char *list, size_t size)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     char *ptr;
     
-    log_debug("bb_listxattr(path=\"%s\", list=0x%08x, size=%d)\n",
+    log_debug("lazfs_listxattr(path=\"%s\", list=0x%08x, size=%d)\n",
 	      path, list, size);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = llistxattr(fpath, list, size);
     if (retstat < 0)
-	retstat = bb_error("bb_listxattr llistxattr");
+	retstat = lazfs_error("lazfs_listxattr llistxattr");
     
     log_debug("    returned attributes (length %d):\n", retstat);
     for (ptr = list; ptr < list + retstat; ptr += strlen(ptr)+1)
@@ -734,18 +734,18 @@ int bb_listxattr(const char *path, char *list, size_t size)
 }
 
 /* Remove extended attributes */
-int bb_removexattr(const char *path, const char *name)
+int lazfs_removexattr(const char *path, const char *name)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_removexattr(path=\"%s\", name=\"%s\")\n",
+    log_debug("\nlazfs_removexattr(path=\"%s\", name=\"%s\")\n",
 	      path, name);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = lremovexattr(fpath, name);
     if (retstat < 0)
-	retstat = bb_error("bb_removexattr lrmovexattr");
+	retstat = lazfs_error("lazfs_removexattr lrmovexattr");
     
     return retstat;
 }
@@ -758,19 +758,19 @@ int bb_removexattr(const char *path, const char *name)
  *
  * Introduced in version 2.3
  */
-int bb_opendir(const char *path, struct fuse_file_info *fi)
+int lazfs_opendir(const char *path, struct fuse_file_info *fi)
 {
     DIR *dp;
     int retstat = 0;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_opendir(path=\"%s\", fi=0x%08x)\n",
+    log_debug("\nlazfs_opendir(path=\"%s\", fi=0x%08x)\n",
 	      path, fi);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     dp = opendir(fpath);
     if (dp == NULL)
-	retstat = bb_error("bb_opendir opendir");
+	retstat = lazfs_error("lazfs_opendir opendir");
     
     fi->fh = (intptr_t) dp;
     
@@ -801,14 +801,14 @@ int bb_opendir(const char *path, struct fuse_file_info *fi)
  *
  * Introduced in version 2.3
  */
-int bb_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
+int lazfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
 	       struct fuse_file_info *fi)
 {
     int retstat = 0;
     DIR *dp;
     struct dirent *de;
     
-    log_debug("\nbb_readdir(path=\"%s\", buf=0x%08x, filler=0x%08x, offset=%lld, fi=0x%08x)\n",
+    log_debug("\nlazfs_readdir(path=\"%s\", buf=0x%08x, filler=0x%08x, offset=%lld, fi=0x%08x)\n",
 	      path, buf, filler, offset, fi);
     // once again, no need for fullpath -- but note that I need to cast fi->fh
     dp = (DIR *) (uintptr_t) fi->fh;
@@ -819,7 +819,7 @@ int bb_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset
     // which I can get an error from readdir()
     de = readdir(dp);
     if (de == 0) {
-	retstat = bb_error("bb_readdir readdir");
+	retstat = lazfs_error("lazfs_readdir readdir");
 	return retstat;
     }
 
@@ -830,7 +830,7 @@ int bb_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset
     do {
 	log_debug("calling filler with name %s\n", de->d_name);
 	if (filler(buf, de->d_name, NULL, 0) != 0) {
-	    log_error("    ERROR bb_readdir filler:  buffer full");
+	    log_error("    ERROR lazfs_readdir filler:  buffer full");
 	    return -ENOMEM;
 	}
     } while ((de = readdir(dp)) != NULL);
@@ -845,11 +845,11 @@ int bb_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset
  *
  * Introduced in version 2.3
  */
-int bb_releasedir(const char *path, struct fuse_file_info *fi)
+int lazfs_releasedir(const char *path, struct fuse_file_info *fi)
 {
     int retstat = 0;
     
-    log_debug("\nbb_releasedir(path=\"%s\", fi=0x%08x)\n",
+    log_debug("\nlazfs_releasedir(path=\"%s\", fi=0x%08x)\n",
 	      path, fi);
     log_fi(fi);
     
@@ -870,11 +870,11 @@ int bb_releasedir(const char *path, struct fuse_file_info *fi)
  * When exactly is this called?  when a user calls fsync and it
  * happens to be a directory?
  */
-int bb_fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
+int lazfs_fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
 {
     int retstat = 0;
     
-    log_debug("\nbb_fsyncdir(path=\"%s\", datasync=%d, fi=0x%08x)\n",
+    log_debug("\nlazfs_fsyncdir(path=\"%s\", datasync=%d, fi=0x%08x)\n",
 	      path, datasync, fi);
     log_fi(fi);
     
@@ -900,10 +900,10 @@ int bb_fsyncdir(const char *path, int datasync, struct fuse_file_info *fi)
  * (and this might as well return void, as it did in older versions of
  * FUSE).
  */
-void *bb_init(struct fuse_conn_info *conn)
+void *lazfs_init(struct fuse_conn_info *conn)
 {
     
-    log_debug("\nbb_init()\n");
+    log_debug("\nlazfs_init()\n");
     
     return BB_DATA;
 }
@@ -915,9 +915,9 @@ void *bb_init(struct fuse_conn_info *conn)
  *
  * Introduced in version 2.3
  */
-void bb_destroy(void *userdata)
+void lazfs_destroy(void *userdata)
 {
-    log_debug("\nbb_destroy(userdata=0x%08x)\n", userdata);
+    log_debug("\nlazfs_destroy(userdata=0x%08x)\n", userdata);
 }
 
 /*
@@ -931,19 +931,19 @@ void bb_destroy(void *userdata)
  *
  * Introduced in version 2.5
  */
-int bb_access(const char *path, int mask)
+int lazfs_access(const char *path, int mask)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
    
-    log_debug("\nbb_access(path=\"%s\", mask=0%o)\n",
+    log_debug("\nlazfs_access(path=\"%s\", mask=0%o)\n",
 	      path, mask);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     retstat = access(fpath, mask);
     
     if (retstat < 0)
-	retstat = bb_error("bb_access access");
+	retstat = lazfs_error("lazfs_access access");
     
     return retstat;
 }
@@ -960,19 +960,19 @@ int bb_access(const char *path, int mask)
  *
  * Introduced in version 2.5
  */
-int bb_create(const char *path, mode_t mode, struct fuse_file_info *fi)
+int lazfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
     int retstat = 0;
     char fpath[PATH_MAX];
     int fd;
     
-    log_debug("\nbb_create(path=\"%s\", mode=0%03o, fi=0x%08x)\n",
+    log_debug("\nlazfs_create(path=\"%s\", mode=0%03o, fi=0x%08x)\n",
 	      path, mode, fi);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
     
     fd = creat(fpath, mode);
     if (fd < 0)
-	retstat = bb_error("bb_create creat");
+	retstat = lazfs_error("lazfs_create creat");
     
     fi->fh = fd;
     
@@ -993,17 +993,17 @@ int bb_create(const char *path, mode_t mode, struct fuse_file_info *fi)
  *
  * Introduced in version 2.5
  */
-int bb_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
+int lazfs_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
 {
     int retstat = 0;
     
-    log_debug("\nbb_ftruncate(path=\"%s\", offset=%lld, fi=0x%08x)\n",
+    log_debug("\nlazfs_ftruncate(path=\"%s\", offset=%lld, fi=0x%08x)\n",
 	      path, offset, fi);
     log_fi(fi);
     
     retstat = ftruncate(fi->fh, offset);
     if (retstat < 0)
-	retstat = bb_error("bb_ftruncate ftruncate");
+	retstat = lazfs_error("lazfs_ftruncate ftruncate");
     
     return retstat;
 }
@@ -1020,21 +1020,21 @@ int bb_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
  *
  * Introduced in version 2.5
  *
- * Since it's currently only called after bb_create(), and bb_create()
+ * Since it's currently only called after lazfs_create(), and lazfs_create()
  * opens the file, I ought to be able to just use the fd and ignore
  * the path...
  */
-int bb_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
+int lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
     int retstat = 0, tmpfd;
     las_cache_t *cache = BB_DATA->cache;
     struct stat tmpstatbuf;
     char fpath[PATH_MAX];
     
-    log_debug("\nbb_fgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n",
+    log_debug("\nlazfs_fgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n",
 	      path, statbuf, fi);
     log_fi(fi);
-    bb_fullpath(fpath, path);
+    lazfs_fullpath(fpath, path);
 
     if (exec_hooks(fpath)) {
 	/* File must have been already opened via open() */
@@ -1042,13 +1042,13 @@ int bb_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *f
 	assert(retstat == 0);
 	retstat = fstat(tmpfd, &tmpstatbuf);
 	if (retstat != 0) {
-	    retstat = bb_error("bb_fgetattr, tmpfd fstat");
+	    retstat = lazfs_error("lazfs_fgetattr, tmpfd fstat");
 	    return retstat;
 	}
 
 	retstat = fstat(fi->fh, statbuf);
 	if (retstat < 0) {
-	    retstat = bb_error("bb_fgetattr fstat");
+	    retstat = lazfs_error("lazfs_fgetattr fstat");
 	    return retstat;
 	}
 
@@ -1060,7 +1060,7 @@ int bb_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *f
     } else {
 	retstat = fstat(fi->fh, statbuf);
 	if (retstat < 0) {
-	    retstat = bb_error("bb_fgetattr fstat");
+	    retstat = lazfs_error("lazfs_fgetattr fstat");
 	    return retstat;
 	}
     }
@@ -1070,47 +1070,47 @@ int bb_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *f
     return retstat;
 }
 
-struct fuse_operations bb_oper = {
-  .getattr = bb_getattr,
-  .readlink = bb_readlink,
+struct fuse_operations lazfs_oper = {
+  .getattr = lazfs_getattr,
+  .readlink = lazfs_readlink,
   // no .getdir -- that's deprecated
   .getdir = NULL,
-  .mknod = bb_mknod,
-  .mkdir = bb_mkdir,
-  .unlink = bb_unlink,
-  .rmdir = bb_rmdir,
-  .symlink = bb_symlink,
-  .rename = bb_rename,
-  .link = bb_link,
-  .chmod = bb_chmod,
-  .chown = bb_chown,
-  .truncate = bb_truncate,
-  .utime = bb_utime,
-  .open = bb_open,
-  .read = bb_read,
-  .write = bb_write,
+  .mknod = lazfs_mknod,
+  .mkdir = lazfs_mkdir,
+  .unlink = lazfs_unlink,
+  .rmdir = lazfs_rmdir,
+  .symlink = lazfs_symlink,
+  .rename = lazfs_rename,
+  .link = lazfs_link,
+  .chmod = lazfs_chmod,
+  .chown = lazfs_chown,
+  .truncate = lazfs_truncate,
+  .utime = lazfs_utime,
+  .open = lazfs_open,
+  .read = lazfs_read,
+  .write = lazfs_write,
   /** Just a placeholder, don't set */ // huh???
-  .statfs = bb_statfs,
-  .flush = bb_flush,
-  .release = bb_release,
-  .fsync = bb_fsync,
-  .setxattr = bb_setxattr,
-  .getxattr = bb_getxattr,
-  .listxattr = bb_listxattr,
-  .removexattr = bb_removexattr,
-  .opendir = bb_opendir,
-  .readdir = bb_readdir,
-  .releasedir = bb_releasedir,
-  .fsyncdir = bb_fsyncdir,
-  .init = bb_init,
-  .destroy = bb_destroy,
-  .access = bb_access,
-  .create = bb_create,
-  .ftruncate = bb_ftruncate,
-  .fgetattr = bb_fgetattr
+  .statfs = lazfs_statfs,
+  .flush = lazfs_flush,
+  .release = lazfs_release,
+  .fsync = lazfs_fsync,
+  .setxattr = lazfs_setxattr,
+  .getxattr = lazfs_getxattr,
+  .listxattr = lazfs_listxattr,
+  .removexattr = lazfs_removexattr,
+  .opendir = lazfs_opendir,
+  .readdir = lazfs_readdir,
+  .releasedir = lazfs_releasedir,
+  .fsyncdir = lazfs_fsyncdir,
+  .init = lazfs_init,
+  .destroy = lazfs_destroy,
+  .access = lazfs_access,
+  .create = lazfs_create,
+  .ftruncate = lazfs_ftruncate,
+  .fgetattr = lazfs_fgetattr
 };
 
-void bb_usage()
+void lazfs_usage()
 {
     fprintf(stderr, "usage:  bbfs [FUSE and mount options] rootDir mountPoint\n");
     abort();
@@ -1119,7 +1119,7 @@ void bb_usage()
 int main(int argc, char *argv[])
 {
     int fuse_stat;
-    struct bb_state *bb_data;
+    struct lazfs_state *lazfs_data;
 
     // bbfs doesn't do any access checking on its own (the comment
     // blocks in fuse.h mention some of the functions that need
@@ -1141,33 +1141,33 @@ int main(int argc, char *argv[])
     // rootpoint or mountpoint whose name starts with a hyphen, but so
     // will a zillion other programs)
     if ((argc < 3) || (argv[argc-2][0] == '-') || (argv[argc-1][0] == '-'))
-	bb_usage();
+	lazfs_usage();
 
-    bb_data = malloc(sizeof(struct bb_state));
-    if (bb_data == NULL) {
+    lazfs_data = malloc(sizeof(struct lazfs_state));
+    if (lazfs_data == NULL) {
 	perror("main calloc");
 	abort();
     }
 
     /* Initialize .las file cache */
-    bb_data->cache = NULL;
-    if (cache_create(&bb_data->cache) != 0) {
+    lazfs_data->cache = NULL;
+    if (cache_create(&lazfs_data->cache) != 0) {
 	perror("Failed to create .las cache");
 	abort();
     }
 
     // Pull the rootdir out of the argument list and save it in my
     // internal data
-    bb_data->rootdir = realpath(argv[argc-2], NULL);
+    lazfs_data->rootdir = realpath(argv[argc-2], NULL);
     argv[argc-2] = argv[argc-1];
     argv[argc-1] = NULL;
     argc--;
     
-    bb_data->logfile = log_open();
+    lazfs_data->logfile = log_open();
     
     // turn over control to fuse
     fprintf(stderr, "about to call fuse_main\n");
-    fuse_stat = fuse_main(argc, argv, &bb_oper, bb_data);
+    fuse_stat = fuse_main(argc, argv, &lazfs_oper, lazfs_data);
     fprintf(stderr, "fuse_main returned %d\n", fuse_stat);
     
     return fuse_stat;

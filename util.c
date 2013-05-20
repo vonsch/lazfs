@@ -51,17 +51,17 @@ exec_hooks(const char *fpath)
  * whenever I need a path for something I'll call this to construct
  * it.
  */
-void bb_fullpath(char fpath[PATH_MAX], const char *path)
+void lazfs_fullpath(char fpath[PATH_MAX], const char *path)
 {
     strcpy(fpath, BB_DATA->rootdir);
     strncat(fpath, path, PATH_MAX); /* FIXME: long paths will break here */
 
-    log_debug("    bb_fullpath:  rootdir = \"%s\", path = \"%s\", fpath = \"%s\"\n",
+    log_debug("    lazfs_fullpath:  rootdir = \"%s\", path = \"%s\", fpath = \"%s\"\n",
 	      BB_DATA->rootdir, path, fpath);
 }
 
 int
-bb_error(const char *str)
+lazfs_error(const char *str)
 {
     int ret = -errno;
 
@@ -90,7 +90,7 @@ decompress(const char *name, int fd)
 
     tmpfd = mkstemp(tmpfilename);
     if (tmpfd == -1) {
-	bb_error("decompress mkstemp");
+	lazfs_error("decompress mkstemp");
 	goto cleanup;
     }
 
@@ -147,7 +147,7 @@ decompress(const char *name, int fd)
     /* Cache that this .laz file is already decompressed */
     retstat = cache_add(cache, name, tmpfilename, tmpfd);
     if (retstat != 0) {
-	log_error("    ERROR: bb_open - cache_add failed\n");
+	log_error("    ERROR: lazfs_open - cache_add failed\n");
 	goto cleanup;
     }
 
