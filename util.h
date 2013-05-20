@@ -7,6 +7,7 @@
 
 #ifndef _UTIL_H_
 #define _UTIL_H_
+#include <limits.h>
 #include <string.h>
 #include <pthread.h>
 
@@ -29,6 +30,9 @@
  * decompressed to /tmp/ background file). Note that fpath _must_ be full path.
  */
 char exec_hooks(const char *fpath);
+
+/* Returns full path of the file */
+void bb_fullpath(char fpath[PATH_MAX], const char *path);
 
 /* Decompresses file from opened fd and caches it */
 int decompress(const char *name, int fd);

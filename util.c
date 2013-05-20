@@ -44,6 +44,22 @@ exec_hooks(const char *fpath)
     return 0;
 }
 
+/*
+ * All the paths I see are relative to the root of the mounted
+ * filesystem. In order to get to the underlying filesystem, I need to
+ * have the mountpoint. I'll save it away early on in main(), and then
+ * whenever I need a path for something I'll call this to construct
+ * it.
+ */
+void bb_fullpath(char fpath[PATH_MAX], const char *path)
+{
+    strcpy(fpath, BB_DATA->rootdir);
+    strncat(fpath, path, PATH_MAX); /* FIXME: long paths will break here */
+
+    log_debug("    bb_fullpath:  rootdir = \"%s\", path = \"%s\", fpath = \"%s\"\n",
+	      BB_DATA->rootdir, path, fpath);
+}
+
 int
 bb_error(const char *str)
 {
