@@ -23,7 +23,7 @@
 
 #include "log.h"
 
-char debug = 0;
+char debug = 1;
 
 FILE *log_open()
 {

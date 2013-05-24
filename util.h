@@ -36,8 +36,26 @@ lazfs_exec_hooks(const char *fpath);
 void
 lazfs_fullpath(char fpath[PATH_MAX], const char *path);
 
-/* Decompresses file from opened fd and caches it */
+/* Decompresses file from source fd to destination fd */
 int
-lazfs_decompress(const char *name, int fd);
+lazfs_decompress(int sfd, int dfd);
+
+/*
+ * Prepare file for decompression
+ * 1. Open compressed "path" and return it's fd in "fd"
+ * 2. Create temporary file and return it's path in "tmppath" and it's fd in
+ *    "tmpfd"
+ *
+ * Returns 0 in case of success or -errno in case of failure.
+ */
+int
+lazfs_prepare_decompress(const char *path, char *tmppath, int *fd, int *tmpfd);
+
+/*
+ * Finish decompression and clean all temporary resources.
+ * After this call file is no longer decompressed.
+ */
+void
+lazfs_finish_decompress(char *tmppath, int *fd, int *tmpfd);
 
 #endif

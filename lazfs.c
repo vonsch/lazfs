@@ -47,13 +47,12 @@
 int
 lazfs_getattr(const char *path, struct stat *statbuf)
 {
-	int retstat = 0, ret;
+	int retstat = 0;
 	char fpath[PATH_MAX];
 	char fpath_laz[PATH_MAX];
-	char *tmpfilename;
+	char tmppath[] = "/tmp/lazfs.XXXXXX";
 	char decompressed = 0;
 	int fd = -1, tmpfd;
-	laz_cache_t *cache = LAZFS_DATA->cache;
 	struct stat tmpstatbuf;
 
 	log_debug("\nlazfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
@@ -72,27 +71,24 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 			goto cleanup;
 		}
 
-		if (cache_get(cache, path, &tmpfilename, &tmpfd) == 0)
-			goto cached;
-
 		/* We must decompress file to get it's length, sigh */
-		fd = open(fpath_laz, O_RDONLY);
-		if (fd < 0) {
-			retstat = lazfs_error("lazfs_getattr open");
+		retstat = lazfs_prepare_decompress(fpath_laz, tmppath, &fd, &tmpfd);
+		if (retstat != 0) {
+			log_error("lazfs_getattr: lazfs_prepare_decompress failed");
 			goto cleanup;
 		}
 
-		retstat = lazfs_decompress(path, fd);
+		decompressed = 1;
+
+		retstat = lazfs_decompress(fd, tmpfd);
 		if (retstat != 0) {
-			log_error("    ERROR: lazfs_getattr: decompress failed");
+			log_error("lazfs_getattr: lazfs_decompress decompress failed");
 			goto cleanup;
-		} else {
-			decompressed = 1;
-			retstat = cache_get(cache, path, &tmpfilename, &tmpfd);
-			assert(retstat == 0);
 		}
-cached:
-		retstat = lstat(tmpfilename, &tmpstatbuf);
+
+		/* TODO: Cache file here */
+
+		retstat = lstat(tmppath, &tmpstatbuf);
 		if (retstat != 0) {
 			retstat = lazfs_error("lazfs_getattr tmpfile lstat");
 			goto cleanup;
@@ -115,17 +111,8 @@ cached:
 	retstat = 0;
 
 cleanup:
-	if (decompressed) {
-		ret = close(tmpfd);
-		if (ret)
-			retstat = ret;
-
-		ret = unlink(tmpfilename);
-		if (ret)
-			retstat = ret;
-
-		cache_remove(cache, path);
-	}
+	if (decompressed)
+		lazfs_finish_decompress(tmppath, &fd, &tmpfd);
 	if (fd != -1)
 		close(fd);
 
@@ -417,8 +404,11 @@ int
 lazfs_open(const char *path, struct fuse_file_info *fi)
 {
 	int retstat = 0;
-	int fd = -1;
+	int fd = -1, tmpfd = -1;
 	char fpath[PATH_MAX], fpath_laz[PATH_MAX];
+	char tmppath[] = "/tmp/lazfs.XXXXXX";
+	laz_cache_t *cache = LAZFS_DATA->cache;
+	char decompressed = 0;
 
 	log_debug("\nlazfs_open(path\"%s\", fi=0x%08x)\n",
 		  path, fi);
@@ -430,17 +420,29 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 		fpath_laz[PATH_MAX - 1] = '\0';
 		fpath_laz[strlen(fpath_laz) - 1] = 'z';
 
-		log_debug("\nlazfs_open - opening laz file \"%s\"\n", fpath_laz);
+		log_debug("\nlazfs_open: opening laz file \"%s\"\n", fpath_laz);
 
-		fd = open(fpath_laz, fi->flags);
-		if (fd < 0) {
-			retstat = lazfs_error("lazfs_open open");
+		/* FIXME: We shouldn't ignore fi->flags */
+		retstat = lazfs_prepare_decompress(fpath_laz, tmppath, &fd, &tmpfd);
+		if (retstat != 0) {
+			log_error("lazfs_open: lazfs_prepare_decompress failed");
 			goto cleanup;
 		}
 
-		retstat = lazfs_decompress(path, fd);
-		if (retstat != 0)
+		decompressed = 1;
+
+		retstat = lazfs_decompress(fd, tmpfd);
+		if (retstat != 0) {
+			log_error("lazfs_open: lazfs_decompress failed");
 			goto cleanup;
+		}
+
+		retstat = cache_add(cache, path, tmppath, tmpfd);
+		if (retstat != 0) {
+			log_error("lazfs_open: cache_add failed");
+			goto cleanup;
+		}
+
 	} else {
 		fd = open(fpath, fi->flags);
 		if (fd < 0) {
@@ -455,6 +457,8 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 	return 0;
 
 cleanup:
+	if (decompressed)
+		lazfs_finish_decompress(tmppath, &fd, &tmpfd);
 	if (fd != -1)
 		close(fd);
 
@@ -628,7 +632,6 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 {
 	int ret, retstat = 0;
 	char *tmpfilename;
-	char tmpfilename2[PATH_MAX];
 	int tmpfd;
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	char fpath[PATH_MAX];
@@ -638,29 +641,21 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 	log_fi(fi);
 	lazfs_fullpath(fpath, path);
 
+	// We need to close the file.  Had we allocated any resources
+	// (buffers etc) we'd need to free them here as well.
+
 	if (lazfs_exec_hooks(fpath)) {
 		retstat = cache_get(cache, path, &tmpfilename, &tmpfd);
 		assert(retstat == 0); /* This file must have been opened & cached */
 
-		/* Preserve tmpfilename because it gets destroyed after cache_remove */
-		strncpy(tmpfilename2, tmpfilename, PATH_MAX);
+		lazfs_finish_decompress(tmpfilename, (int *)&fi->fh, &tmpfd);
 
 		cache_remove(cache, path);
-
-		ret = close(tmpfd);
-		if (ret)
-			retstat = ret;
-
-		ret = unlink(tmpfilename2);
+	} else {
+		ret = close(fi->fh);
 		if (ret)
 			retstat = ret;
 	}
-
-	// We need to close the file.  Had we allocated any resources
-	// (buffers etc) we'd need to free them here as well.
-	ret = close(fi->fh);
-	if (ret)
-		retstat = ret;
     
 	return retstat;
 }

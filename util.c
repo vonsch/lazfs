@@ -72,35 +72,22 @@ lazfs_error(const char *str)
 }
 
 int
-lazfs_decompress(const char *name, int fd)
+lazfs_decompress(int sfd, int dfd)
 {
 	LASReaderH reader = NULL;
 	LASWriterH writer = NULL;
 	LASHeaderH wheader = NULL;
 	LASPointH p = NULL;
-	laz_cache_t *cache = LAZFS_DATA->cache;
-	char tmpfilename[] = "/tmp/lazfs.XXXXXX";
-	int tmpfd = -1;
-	int retstat = 0;
+	int ret = 0;
 
-	log_debug("\ndecompressing file \"%s\"\n", name);
+	log_debug("\ndecompressing file: sfd: \"%d\", dfd:\"%d\"\n", sfd, dfd);
 
-	/* Check if we already decompressed it */
-	if (cache_get(cache, name, NULL, &tmpfd) == 0)
-		return 0;
-
-	tmpfd = mkstemp(tmpfilename);
-	if (tmpfd == -1) {
-		lazfs_error("decompress mkstemp");
-		goto cleanup;
-	}
-
-	reader = LASReader_CreateFd(fd);
+	reader = LASReader_CreateFd(sfd);
 	if (reader == NULL) {
 		log_error("    ERROR: LASReader_CreateFd failed: %s\n",
 		LASError_GetLastErrorMsg());
 		/* FIXME: We should return more codes */
-		retstat = -ENOMEM;
+		ret = -ENOMEM;
 		goto cleanup;
 	}
 
@@ -109,22 +96,22 @@ lazfs_decompress(const char *name, int fd)
 		log_error("    ERROR: LASHeader_Copy failed: %s\n",
 		LASError_GetLastErrorMsg());
 		/* FIXME: Return more codes? */
-		retstat = -ENOMEM;
+		ret = -ENOMEM;
 		goto cleanup;
 	}
 
 	if (LASHeader_SetCompressed(wheader, 0) != 0) {
 		log_error("    ERROR: LASHeader_SetCompressed failed: %s\n",
 		LASError_GetLastErrorMsg());
-		retstat = -ENOMEM; /* FIXME: What's more appropriate errno? */
+		ret = -ENOMEM; /* FIXME: What's more appropriate errno? */
 		goto cleanup;
 	}
 
-	writer = LASWriter_CreateFd(tmpfd, wheader, LAS_MODE_WRITE);
+	writer = LASWriter_CreateFd(dfd, wheader, LAS_MODE_WRITE);
 	if (writer == NULL) {
 		log_error("    ERROR: LASWriter_CreateFd failed: %s\n",
 		LASError_GetLastErrorMsg());
-		retstat = -ENOMEM;
+		ret = -ENOMEM;
 		goto cleanup;
 	}
 
@@ -135,7 +122,7 @@ lazfs_decompress(const char *name, int fd)
 			log_error("    ERROR: LASWriter_WritePoint failed: %s\n",
 			LASError_GetLastErrorMsg());
 			/* FIXME: Is there more appropriate errno? */
-			retstat = -ENOSPC;
+			ret = -ENOSPC;
 			goto cleanup;
 		}
 		p = LASReader_GetNextPoint(reader);
@@ -144,13 +131,6 @@ lazfs_decompress(const char *name, int fd)
 	LASWriter_Destroy(writer);
 	LASReader_Destroy(reader);
 	LASHeader_Destroy(wheader);
-
-	/* Cache that this .laz file is already decompressed */
-	retstat = cache_add(cache, name, tmpfilename, tmpfd);
-	if (retstat != 0) {
-		log_error("    ERROR: lazfs_open - cache_add failed\n");
-		goto cleanup;
-	}
 
 	return 0;
 
@@ -161,10 +141,71 @@ cleanup:
 		LASHeader_Destroy(wheader);
 	if (reader != NULL)
 		LASReader_Destroy(reader);
-	if (tmpfd != -1) {
-		close(tmpfd);
-		unlink(tmpfilename);
+
+	return ret;
+}
+
+int
+lazfs_prepare_decompress(const char *path, char *tmppath, int *fdp, int *tmpfdp)
+{
+	int fd = -1, tmpfd = -1, ret;
+
+	assert(path != NULL);
+	assert(tmppath != NULL);
+	assert(fdp != NULL);
+	assert(tmpfdp != NULL);
+
+	log_debug("\nprepare_decompress: \"p: %s\", tmpp: \"%s\", fd: \"%d\", "
+		  "tmpfd: \"%d\"\n", path, tmppath, *fdp, *tmpfdp);
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		ret = lazfs_error("prepare_decompress open");
+		goto cleanup;
 	}
 
-	return retstat;
+	tmpfd = mkstemp(tmppath);
+	if (tmpfd == -1) {
+		ret = lazfs_error("prepare_decompress mkstemp");
+		goto cleanup;
+	}
+
+	*fdp = fd;
+	*tmpfdp = tmpfd;
+
+	return 0;
+
+cleanup:
+	if (fd != -1)
+		close(fd);
+	if (tmpfd != -1) {
+		unlink(tmppath);
+		close(tmpfd);
+	}
+
+	return ret;
+}
+
+void
+lazfs_finish_decompress(char *tmppath, int *fd, int *tmpfd)
+{
+	int ret;
+
+	assert(tmppath != NULL);
+	assert(fd != NULL && *fd > 0);
+	assert(tmpfd != NULL && *tmpfd > 0);
+
+	log_debug("\nfinish_decompress: tmppath: \"%s\", fd: \"%d\", "
+		  "tmpfd: \"%d\"\n", tmppath, *fd, *tmpfd);
+
+	ret = close(*fd);
+	assert(ret == 0); /* Close failure indicates a bug */
+	*fd = -1;
+
+	ret = close(*tmpfd);
+	assert(ret == 0); /* Ditto */
+	*tmpfd = -1;
+
+	ret = unlink(tmppath);
+	assert(ret == 0); /* Ditto */
 }
