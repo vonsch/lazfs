@@ -53,7 +53,7 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 	char *tmpfilename;
 	char decompressed = 0;
 	int fd = -1, tmpfd;
-	laz_cache_t *cache = BB_DATA->cache;
+	laz_cache_t *cache = LAZFS_DATA->cache;
 	struct stat tmpstatbuf;
 
 	log_debug("\nlazfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
@@ -485,7 +485,7 @@ lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 {
 	int retstat = 0;
 	int tmpfd = -1;
-	laz_cache_t *cache = BB_DATA->cache;
+	laz_cache_t *cache = LAZFS_DATA->cache;
 	char fpath[PATH_MAX];
 
 	log_debug("\nlazfs_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
@@ -630,7 +630,7 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 	char *tmpfilename;
 	char tmpfilename2[PATH_MAX];
 	int tmpfd;
-	laz_cache_t *cache = BB_DATA->cache;
+	laz_cache_t *cache = LAZFS_DATA->cache;
 	char fpath[PATH_MAX];
 
 	log_debug("\nlazfs_release(path=\"%s\", fi=0x%08x)\n",
@@ -930,7 +930,7 @@ lazfs_init(struct fuse_conn_info *conn)
 {
 	log_debug("\nlazfs_init()\n");
 
-	return BB_DATA;
+	return LAZFS_DATA;
 }
 
 /*
@@ -1057,7 +1057,7 @@ int
 lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
 	int retstat = 0, tmpfd;
-	laz_cache_t *cache = BB_DATA->cache;
+	laz_cache_t *cache = LAZFS_DATA->cache;
 	struct stat tmpstatbuf;
 	char fpath[PATH_MAX];
 

@@ -30,6 +30,6 @@ struct lazfs_state {
     char *rootdir;
     laz_cache_t *cache;
 };
-#define BB_DATA ((struct lazfs_state *) fuse_get_context()->private_data)
+#define LAZFS_DATA ((struct lazfs_state *) fuse_get_context()->private_data)
 
 #endif

@@ -54,11 +54,11 @@ lazfs_exec_hooks(const char *fpath)
 void
 lazfs_fullpath(char fpath[PATH_MAX], const char *path)
 {
-	strcpy(fpath, BB_DATA->rootdir);
+	strcpy(fpath, LAZFS_DATA->rootdir);
 	strncat(fpath, path, PATH_MAX); /* FIXME: long paths will break here */
 
 	log_debug("    lazfs_fullpath:  rootdir = \"%s\", path = \"%s\", fpath = \"%s\"\n",
-		  BB_DATA->rootdir, path, fpath);
+		  LAZFS_DATA->rootdir, path, fpath);
 }
 
 int
@@ -78,7 +78,7 @@ lazfs_decompress(const char *name, int fd)
 	LASWriterH writer = NULL;
 	LASHeaderH wheader = NULL;
 	LASPointH p = NULL;
-	laz_cache_t *cache = BB_DATA->cache;
+	laz_cache_t *cache = LAZFS_DATA->cache;
 	char tmpfilename[] = "/tmp/lazfs.XXXXXX";
 	int tmpfd = -1;
 	int retstat = 0;
