@@ -140,7 +140,6 @@ cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
 
 	assert(cache != NULL);
 
-	LOCK(cache->lock);
 	err = file_entry_create(&entry, filename, tmpfilename, tmpfd);
 	if (err)
 		goto cleanup;
@@ -148,8 +147,6 @@ cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
 	LIST_INSERT_HEAD(&cache->entries, entry, link);
 
 cleanup:
-	UNLOCK(cache->lock);
-
 	return err;
 }
 
@@ -161,8 +158,6 @@ cache_remove(laz_cache_t *cache, const char *filename)
 	assert(cache != NULL);
 	assert(filename != NULL);
 
-	LOCK(cache->lock);
-
 	/* FIXME: Should we treat empty cache as error? */
 	if (cache->entries.lh_first == NULL)
 		return;
@@ -171,13 +166,11 @@ cache_remove(laz_cache_t *cache, const char *filename)
 		if (strcmp(entry->name, filename) == 0) {
 			LIST_REMOVE(entry, link);
 			file_entry_destroy(&entry);
-			goto cleanup;
+			return;
 		}
 	}
 
-cleanup:
 	/* FIXME: Treat cache notfound as error? */
-	UNLOCK(cache->lock);
 }
 
 int
@@ -190,7 +183,6 @@ cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
 	assert(filename != NULL);
 	assert(tmpfd != NULL);
 
-	LOCK(cache->lock);
 	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
 		if (strcmp(entry->name, filename) == 0) {
 			*tmpfd = entry->tmpfd;
@@ -199,7 +191,6 @@ cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
 			break;
 		}
 	}
-	UNLOCK(cache->lock);
 
 	return (entry != NULL) ? 0 : 1;
 }
