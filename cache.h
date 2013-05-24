@@ -36,4 +36,12 @@ int
 cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
 	  int *tmpfd);
 
+/* Lock the cache */
+void
+cache_lock(laz_cache_t *cache);
+
+/* Unlock the cache */
+void
+cache_unlock(laz_cache_t *cache);
+
 #endif

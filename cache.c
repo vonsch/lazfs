@@ -203,3 +203,16 @@ cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
 
 	return (entry != NULL) ? 0 : 1;
 }
+
+void
+cache_lock(laz_cache_t *cache)
+{
+	LOCK(cache->lock);
+}
+
+void
+cache_unlock(laz_cache_t *cache)
+{
+	UNLOCK(cache->lock);
+}
+
