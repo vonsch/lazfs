@@ -408,7 +408,7 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 	char fpath[PATH_MAX], fpath_laz[PATH_MAX];
 	char tmppath[] = "/tmp/lazfs.XXXXXX";
 	laz_cache_t *cache = LAZFS_DATA->cache;
-	char decompressed = 0;
+	char decompressed = 0, locked = 0;
 
 	log_debug("\nlazfs_open(path\"%s\", fi=0x%08x)\n",
 		  path, fi);
@@ -416,6 +416,13 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 
 	if (lazfs_exec_hooks(fpath)) {
 		/* We got request for .las file */
+
+		cache_lock(cache);
+		locked = 1;
+		retstat = cache_get(cache, path, NULL, &fd, &tmpfd, 1);
+		if (retstat == 0)
+			goto cached;
+
 		strncpy(fpath_laz, fpath, PATH_MAX);
 		fpath_laz[PATH_MAX - 1] = '\0';
 		fpath_laz[strlen(fpath_laz) - 1] = 'z';
@@ -442,7 +449,6 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 			log_error("lazfs_open: cache_add failed");
 			goto cleanup;
 		}
-
 	} else {
 		fd = open(fpath, fi->flags);
 		if (fd < 0) {
@@ -450,13 +456,16 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 			goto cleanup;
 		}
 	}
-
+cached:
+	cache_unlock(cache);
 	fi->fh = fd;
 	log_fi(fi);
 
 	return 0;
 
 cleanup:
+	if (locked)
+		cache_unlock(cache);
 	if (decompressed)
 		lazfs_finish_decompress(tmppath, &fd, &tmpfd);
 	if (fd != -1)
@@ -498,7 +507,9 @@ lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 	lazfs_fullpath(fpath, path);
 
 	if (lazfs_exec_hooks(fpath)) {
-		retstat = cache_get(cache, path, NULL, NULL, &tmpfd);
+		cache_lock(cache);
+		retstat = cache_get(cache, path, NULL, NULL, &tmpfd, 1);
+		cache_unlock(cache);
 		/* Every read file must have been opened & cached */
 		assert(retstat == 0);
 	} else
@@ -507,6 +518,12 @@ lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 	retstat = pread(tmpfd, buf, size, offset);
 	if (retstat < 0)
 		retstat = lazfs_error("lazfs_read read");
+
+	if (lazfs_exec_hooks(fpath)) {
+		cache_lock(cache);
+		cache_remove(cache, path);
+		cache_unlock(cache);
+	}
 
 	return retstat;
 }
@@ -645,12 +662,12 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 	// (buffers etc) we'd need to free them here as well.
 
 	if (lazfs_exec_hooks(fpath)) {
-		retstat = cache_get(cache, path, &tmpfilename, &fd, &tmpfd);
-		assert(retstat == 0); /* This file must have been opened & cached */
-
+		cache_lock(cache);
+		cache_get(cache, path, &tmpfilename, &fd, &tmpfd, 0);
+		/* NOTE: tmpfilename becomes invalid after cache_remove call. */
 		lazfs_finish_decompress(tmpfilename, &fd, &tmpfd);
-
 		cache_remove(cache, path);
+		cache_unlock(cache);
 	} else {
 		ret = close(fi->fh);
 		if (ret)
@@ -1062,19 +1079,21 @@ lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi
 	lazfs_fullpath(fpath, path);
 
 	if (lazfs_exec_hooks(fpath)) {
+		cache_lock(cache);
 		/* File must have been already opened via open() */
-		retstat = cache_get(cache, path, NULL, &fd, &tmpfd);
+		retstat = cache_get(cache, path, NULL, &fd, &tmpfd, 1);
+		cache_unlock(cache);
 		assert(retstat == 0);
 		retstat = fstat(tmpfd, &tmpstatbuf);
 		if (retstat != 0) {
 			retstat = lazfs_error("lazfs_fgetattr, tmpfd fstat");
-			return retstat;
+			goto cleanup;
 		}
 
 		retstat = fstat(fd, statbuf);
 		if (retstat < 0) {
 			retstat = lazfs_error("lazfs_fgetattr fstat");
-			return retstat;
+			goto cleanup;
 		}
 
 		/* Merge attributes to output statbuf */
@@ -1082,6 +1101,11 @@ lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi
 		statbuf->st_atime = tmpstatbuf.st_atime;
 		statbuf->st_mtime = tmpstatbuf.st_mtime;
 		statbuf->st_ctime = tmpstatbuf.st_ctime;
+
+cleanup:
+		cache_lock(cache);
+		cache_remove(cache, path);
+		cache_unlock(cache);
 	} else {
 		retstat = fstat(fi->fh, statbuf);
 		if (retstat < 0) {

@@ -22,7 +22,10 @@ cache_create(laz_cache_t **cachep);
 void
 cache_destroy(laz_cache_t **cachep);
 
-/* Adds existing decompressed file + it's open fd to cache */
+/*
+ * Adds existing decompressed file + it's open fd to cache. Initial cache
+ * external references count is 1.
+ */
 int
 cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
 	  int fd, int tmpfd);
@@ -34,7 +37,7 @@ cache_remove(laz_cache_t *cache, const char *filename);
 /* Get item from cache. Returns zero if found. */
 int
 cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
-	  int *fd, int *tmpfd);
+	  int *fd, int *tmpfd, char increfs);
 
 /* Lock the cache */
 void

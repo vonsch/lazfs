@@ -23,6 +23,7 @@ struct file_entry {
 	char *tmpname; /* Name of temporary decompressed .las */
 	int fd; /* Open fd to compressed .laz */
 	int tmpfd; /* Open fd of the temporary decompressed .las */
+	int refs; /* Number of external references to this entry */
 	LIST_ENTRY(file_entry) link;
 };
 
@@ -120,6 +121,8 @@ cache_destroy(laz_cache_t **cachep)
 
 	cache = *cachep;
 
+	assert(cache->entries.lh_first == NULL);
+
 	while (cache->entries.lh_first != NULL) {
 		entry = cache->entries.lh_first;
 		LIST_REMOVE(cache->entries.lh_first, link);
@@ -146,6 +149,7 @@ cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
 	if (err)
 		goto cleanup;
 
+	entry->refs++;
 	LIST_INSERT_HEAD(&cache->entries, entry, link);
 
 cleanup:
@@ -166,8 +170,12 @@ cache_remove(laz_cache_t *cache, const char *filename)
 
 	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
 		if (strcmp(entry->name, filename) == 0) {
-			LIST_REMOVE(entry, link);
-			file_entry_destroy(&entry);
+			entry->refs--;
+			assert(entry->refs >= 0);
+			if (entry->refs == 0) {
+				LIST_REMOVE(entry, link);
+				file_entry_destroy(&entry);
+			}
 			return;
 		}
 	}
@@ -177,7 +185,7 @@ cache_remove(laz_cache_t *cache, const char *filename)
 
 int
 cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
-	  int *fd, int *tmpfd)
+	  int *fd, int *tmpfd, char increfs)
 {
 	file_entry_t *entry;
 
@@ -187,6 +195,8 @@ cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
 
 	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
 		if (strcmp(entry->name, filename) == 0) {
+			if (increfs)
+				entry->refs++;
 			*tmpfd = entry->tmpfd;
 			if (tmpfilename)
 				*tmpfilename = entry->tmpname;
