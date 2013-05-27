@@ -14,6 +14,14 @@
 
 typedef struct laz_cache laz_cache_t;
 
+typedef struct laz_cachestat {
+	char *tmppath;
+	int fd;
+	int tmpfd;
+	char dirty;
+	char lastref;
+} laz_cachestat_t;
+
 /* Creates and initializes file cache. Returns zero on success */
 int
 cache_create(laz_cache_t **cachep);
@@ -40,8 +48,8 @@ cache_dirty(laz_cache_t *cache, const char *filename);
 
 /* Get item from cache. Returns zero if found. */
 int
-cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
-	  int *fd, int *tmpfd, char *dirty, char increfs);
+cache_get(laz_cache_t *cache, const char *filename, char increfs,
+	  laz_cachestat_t *cstat);
 
 /* Lock the cache */
 void

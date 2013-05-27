@@ -409,6 +409,7 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 	char tmppath[] = "/tmp/lazfs.XXXXXX";
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	char decompressed = 0, locked = 0;
+	laz_cachestat_t cstat;
 
 	log_debug("\nlazfs_open(path\"%s\", fi=0x%08x)\n",
 		  path, fi);
@@ -419,9 +420,12 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 
 		cache_lock(cache);
 		locked = 1;
-		retstat = cache_get(cache, path, NULL, &fd, &tmpfd, NULL, 1);
-		if (retstat == 0)
+		retstat = cache_get(cache, path, 1, &cstat);
+		if (retstat == 0) {
+			fd = cstat.fd;
+			tmpfd = cstat.tmpfd;
 			goto cached;
+		}
 
 		strncpy(fpath_laz, fpath, PATH_MAX);
 		fpath_laz[PATH_MAX - 1] = '\0';
@@ -500,6 +504,7 @@ lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 	int tmpfd = -1;
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	char fpath[PATH_MAX];
+	laz_cachestat_t cstat;
 
 	log_debug("\nlazfs_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 		  path, buf, size, offset, fi);
@@ -508,10 +513,11 @@ lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 
 	if (lazfs_exec_hooks(fpath)) {
 		cache_lock(cache);
-		retstat = cache_get(cache, path, NULL, NULL, &tmpfd, NULL, 1);
+		retstat = cache_get(cache, path, 1, &cstat);
 		cache_unlock(cache);
 		/* Every read file must have been opened & cached */
 		assert(retstat == 0);
+		tmpfd = cstat.tmpfd;
 	} else
 		tmpfd = fi->fh;
 
@@ -648,11 +654,9 @@ int
 lazfs_release(const char *path, struct fuse_file_info *fi)
 {
 	int ret, retstat = 0;
-	char *tmpfilename;
-	int fd, tmpfd;
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	char fpath[PATH_MAX];
-	char dirty;
+	laz_cachestat_t cstat;
 
 	log_debug("\nlazfs_release(path=\"%s\", fi=0x%08x)\n",
 		  path, fi);
@@ -664,9 +668,9 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 
 	if (lazfs_exec_hooks(fpath)) {
 		cache_lock(cache);
-		cache_get(cache, path, &tmpfilename, &fd, &tmpfd, &dirty, 0);
+		cache_get(cache, path, 0, &cstat);
 		/* NOTE: tmpfilename becomes invalid after cache_remove call. */
-		lazfs_finish_tmpfile(tmpfilename, &fd, &tmpfd);
+		lazfs_finish_tmpfile(cstat.tmppath, &cstat.fd, &cstat.tmpfd);
 		cache_remove(cache, path);
 		cache_unlock(cache);
 	} else {
@@ -1069,10 +1073,11 @@ lazfs_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
 int
 lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
-	int retstat = 0, tmpfd, fd;
+	int retstat = 0;
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	struct stat tmpstatbuf;
 	char fpath[PATH_MAX];
+	laz_cachestat_t cstat;
 
 	log_debug("\nlazfs_fgetattr(path=\"%s\", statbuf=0x%08x, fi=0x%08x)\n",
 		  path, statbuf, fi);
@@ -1081,17 +1086,17 @@ lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi
 
 	if (lazfs_exec_hooks(fpath)) {
 		cache_lock(cache);
-		/* File must have been already opened via open() */
-		retstat = cache_get(cache, path, NULL, &fd, &tmpfd, NULL, 1);
+		retstat = cache_get(cache, path, 1, &cstat);
 		cache_unlock(cache);
+		/* File must have been already opened via open() */
 		assert(retstat == 0);
-		retstat = fstat(tmpfd, &tmpstatbuf);
+		retstat = fstat(cstat.tmpfd, &tmpstatbuf);
 		if (retstat != 0) {
 			retstat = lazfs_error("lazfs_fgetattr, tmpfd fstat");
 			goto cleanup;
 		}
 
-		retstat = fstat(fd, statbuf);
+		retstat = fstat(cstat.fd, statbuf);
 		if (retstat < 0) {
 			retstat = lazfs_error("lazfs_fgetattr fstat");
 			goto cleanup;

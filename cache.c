@@ -201,26 +201,24 @@ cache_dirty(laz_cache_t *cache, const char *filename)
 }
 
 int
-cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
-	  int *fd, int *tmpfd, char *dirty, char increfs)
+cache_get(laz_cache_t *cache, const char *filename, char increfs, laz_cachestat_t *cstat)
 {
 	file_entry_t *entry;
 
 	assert(cache != NULL);
 	assert(filename != NULL);
-	assert(tmpfd != NULL);
+	assert(cstat != NULL);
 
 	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
 		if (strcmp(entry->name, filename) == 0) {
 			if (increfs)
 				entry->refs++;
-			*tmpfd = entry->tmpfd;
-			if (tmpfilename)
-				*tmpfilename = entry->tmpname;
-			if (fd)
-				*fd = entry->fd;
-			if (dirty)
-				*dirty = entry->dirty;
+
+			cstat->tmppath = entry->tmpname;
+			cstat->fd = entry->fd;
+			cstat->tmpfd = entry->tmpfd;
+			cstat->dirty = entry->dirty;
+			cstat->lastref = (entry->refs == 1) ? 1 : 0;
 			break;
 		}
 	}
