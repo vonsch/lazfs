@@ -146,7 +146,7 @@ cleanup:
 }
 
 int
-lazfs_prepare_decompress(const char *path, char *tmppath, int *fdp, int *tmpfdp)
+lazfs_prepare_tmpfile(const char *path, char *tmppath, int flags, int *fdp, int *tmpfdp)
 {
 	int fd = -1, tmpfd = -1, ret;
 
@@ -155,18 +155,18 @@ lazfs_prepare_decompress(const char *path, char *tmppath, int *fdp, int *tmpfdp)
 	assert(fdp != NULL);
 	assert(tmpfdp != NULL);
 
-	log_debug("\nprepare_decompress: \"p: %s\", tmpp: \"%s\", fd: \"%d\", "
+	log_debug("\nprepare_tmpfile: \"p: %s\", tmpp: \"%s\", fd: \"%d\", "
 		  "tmpfd: \"%d\"\n", path, tmppath, *fdp, *tmpfdp);
 
-	fd = open(path, O_RDONLY);
+	fd = open(path, flags);
 	if (fd < 0) {
-		ret = lazfs_error("prepare_decompress open");
+		ret = lazfs_error("prepare_tmpfile open");
 		goto cleanup;
 	}
 
 	tmpfd = mkstemp(tmppath);
 	if (tmpfd == -1) {
-		ret = lazfs_error("prepare_decompress mkstemp");
+		ret = lazfs_error("prepare_tmpfile mkstemp");
 		goto cleanup;
 	}
 
@@ -187,7 +187,7 @@ cleanup:
 }
 
 void
-lazfs_finish_decompress(char *tmppath, int *fd, int *tmpfd)
+lazfs_finish_tmpfile(char *tmppath, int *fd, int *tmpfd)
 {
 	int ret;
 
@@ -195,7 +195,7 @@ lazfs_finish_decompress(char *tmppath, int *fd, int *tmpfd)
 	assert(fd != NULL && *fd > 0);
 	assert(tmpfd != NULL && *tmpfd > 0);
 
-	log_debug("\nfinish_decompress: tmppath: \"%s\", fd: \"%d\", "
+	log_debug("\nfinish_tmpfile: tmppath: \"%s\", fd: \"%d\", "
 		  "tmpfd: \"%d\"\n", tmppath, *fd, *tmpfd);
 
 	ret = close(*fd);

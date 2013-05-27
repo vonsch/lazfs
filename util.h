@@ -41,7 +41,7 @@ int
 lazfs_decompress(int sfd, int dfd);
 
 /*
- * Prepare file for decompression
+ * Prepare background decompressed tmpfile
  * 1. Open compressed "path" and return it's fd in "fd"
  * 2. Create temporary file and return it's path in "tmppath" and it's fd in
  *    "tmpfd"
@@ -49,13 +49,13 @@ lazfs_decompress(int sfd, int dfd);
  * Returns 0 in case of success or -errno in case of failure.
  */
 int
-lazfs_prepare_decompress(const char *path, char *tmppath, int *fd, int *tmpfd);
+lazfs_prepare_tmpfile(const char *path, char *tmppath, int flags, int *fd, int *tmpfd);
 
 /*
- * Finish decompression and clean all temporary resources.
+ * Finish decompression and clean all temporary resources (i.e. temporary file).
  * After this call file is no longer decompressed.
  */
 void
-lazfs_finish_decompress(char *tmppath, int *fd, int *tmpfd);
+lazfs_finish_tmpfile(char *tmppath, int *fd, int *tmpfd);
 
 #endif

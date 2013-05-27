@@ -30,14 +30,18 @@ int
 cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
 	  int fd, int tmpfd);
 
-/* Removes file from cache */
+/* Removes file from cache. */
 void
 cache_remove(laz_cache_t *cache, const char *filename);
+
+/* Mark file in cache as dirty (i.e. it was written to it) */
+void
+cache_dirty(laz_cache_t *cache, const char *filename);
 
 /* Get item from cache. Returns zero if found. */
 int
 cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
-	  int *fd, int *tmpfd, char increfs);
+	  int *fd, int *tmpfd, char *dirty, char increfs);
 
 /* Lock the cache */
 void

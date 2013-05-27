@@ -24,6 +24,7 @@ struct file_entry {
 	int fd; /* Open fd to compressed .laz */
 	int tmpfd; /* Open fd of the temporary decompressed .las */
 	int refs; /* Number of external references to this entry */
+	char dirty; /* Tracks if compressed file need to be updated */
 	LIST_ENTRY(file_entry) link;
 };
 
@@ -183,9 +184,25 @@ cache_remove(laz_cache_t *cache, const char *filename)
 	/* FIXME: Treat cache notfound as error? */
 }
 
+void
+cache_dirty(laz_cache_t *cache, const char *filename)
+{
+	file_entry_t *entry;
+
+	assert(cache != NULL);
+	assert(filename != NULL);
+
+	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
+		if (strcmp(entry->name, filename) == 0) {
+			entry->dirty = 1;
+			return;
+		}
+	}
+}
+
 int
 cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
-	  int *fd, int *tmpfd, char increfs)
+	  int *fd, int *tmpfd, char *dirty, char increfs)
 {
 	file_entry_t *entry;
 
@@ -202,6 +219,8 @@ cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
 				*tmpfilename = entry->tmpname;
 			if (fd)
 				*fd = entry->fd;
+			if (dirty)
+				*dirty = entry->dirty;
 			break;
 		}
 	}
