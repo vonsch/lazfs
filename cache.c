@@ -21,6 +21,7 @@ typedef struct file_entry file_entry_t;
 struct file_entry {
 	char *name; /* Name of requested .las file */
 	char *tmpname; /* Name of temporary decompressed .las */
+	int fd; /* Open fd to compressed .laz */
 	int tmpfd; /* Open fd of the temporary decompressed .las */
 	LIST_ENTRY(file_entry) link;
 };
@@ -48,7 +49,7 @@ file_entry_destroy(file_entry_t **entryp)
 
 static int
 file_entry_create(file_entry_t **entryp, const char *filename,
-		  const char *tmpfilename, int tmpfd)
+		  const char *tmpfilename, int fd, int tmpfd)
 {
 	file_entry_t *entry;
 	int err;
@@ -75,6 +76,7 @@ file_entry_create(file_entry_t **entryp, const char *filename,
 		goto cleanup;
 	}
 
+	entry->fd = fd;
 	entry->tmpfd = tmpfd;
 	*entryp = entry;
 
@@ -133,14 +135,14 @@ cache_destroy(laz_cache_t **cachep)
 
 int
 cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
-	  int tmpfd)
+	  int fd, int tmpfd)
 {
 	int err = 0;
 	file_entry_t *entry = NULL;
 
 	assert(cache != NULL);
 
-	err = file_entry_create(&entry, filename, tmpfilename, tmpfd);
+	err = file_entry_create(&entry, filename, tmpfilename, fd, tmpfd);
 	if (err)
 		goto cleanup;
 
@@ -175,7 +177,7 @@ cache_remove(laz_cache_t *cache, const char *filename)
 
 int
 cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
-	  int *tmpfd)
+	  int *fd, int *tmpfd)
 {
 	file_entry_t *entry;
 
@@ -188,6 +190,8 @@ cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
 			*tmpfd = entry->tmpfd;
 			if (tmpfilename)
 				*tmpfilename = entry->tmpname;
+			if (fd)
+				*fd = entry->fd;
 			break;
 		}
 	}

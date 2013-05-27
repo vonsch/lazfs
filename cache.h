@@ -25,7 +25,7 @@ cache_destroy(laz_cache_t **cachep);
 /* Adds existing decompressed file + it's open fd to cache */
 int
 cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
-	  int tmpfd);
+	  int fd, int tmpfd);
 
 /* Removes file from cache */
 void
@@ -34,7 +34,7 @@ cache_remove(laz_cache_t *cache, const char *filename);
 /* Get item from cache. Returns zero if found. */
 int
 cache_get(laz_cache_t *cache, const char *filename, char **tmpfilename,
-	  int *tmpfd);
+	  int *fd, int *tmpfd);
 
 /* Lock the cache */
 void

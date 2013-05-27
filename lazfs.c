@@ -437,7 +437,7 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 			goto cleanup;
 		}
 
-		retstat = cache_add(cache, path, tmppath, tmpfd);
+		retstat = cache_add(cache, path, tmppath, fd, tmpfd);
 		if (retstat != 0) {
 			log_error("lazfs_open: cache_add failed");
 			goto cleanup;
@@ -498,7 +498,7 @@ lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 	lazfs_fullpath(fpath, path);
 
 	if (lazfs_exec_hooks(fpath)) {
-		retstat = cache_get(cache, path, NULL, &tmpfd);
+		retstat = cache_get(cache, path, NULL, NULL, &tmpfd);
 		/* Every read file must have been opened & cached */
 		assert(retstat == 0);
 	} else
@@ -632,7 +632,7 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 {
 	int ret, retstat = 0;
 	char *tmpfilename;
-	int tmpfd;
+	int fd, tmpfd;
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	char fpath[PATH_MAX];
 
@@ -645,10 +645,10 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 	// (buffers etc) we'd need to free them here as well.
 
 	if (lazfs_exec_hooks(fpath)) {
-		retstat = cache_get(cache, path, &tmpfilename, &tmpfd);
+		retstat = cache_get(cache, path, &tmpfilename, &fd, &tmpfd);
 		assert(retstat == 0); /* This file must have been opened & cached */
 
-		lazfs_finish_decompress(tmpfilename, (int *)&fi->fh, &tmpfd);
+		lazfs_finish_decompress(tmpfilename, &fd, &tmpfd);
 
 		cache_remove(cache, path);
 	} else {
@@ -1051,7 +1051,7 @@ lazfs_ftruncate(const char *path, off_t offset, struct fuse_file_info *fi)
 int
 lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi)
 {
-	int retstat = 0, tmpfd;
+	int retstat = 0, tmpfd, fd;
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	struct stat tmpstatbuf;
 	char fpath[PATH_MAX];
@@ -1063,7 +1063,7 @@ lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi
 
 	if (lazfs_exec_hooks(fpath)) {
 		/* File must have been already opened via open() */
-		retstat = cache_get(cache, path, NULL, &tmpfd);
+		retstat = cache_get(cache, path, NULL, &fd, &tmpfd);
 		assert(retstat == 0);
 		retstat = fstat(tmpfd, &tmpstatbuf);
 		if (retstat != 0) {
@@ -1071,7 +1071,7 @@ lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi
 			return retstat;
 		}
 
-		retstat = fstat(fi->fh, statbuf);
+		retstat = fstat(fd, statbuf);
 		if (retstat < 0) {
 			retstat = lazfs_error("lazfs_fgetattr fstat");
 			return retstat;
