@@ -670,7 +670,8 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 		cache_lock(cache);
 		cache_get(cache, path, 0, &cstat);
 		/* NOTE: tmpfilename becomes invalid after cache_remove call. */
-		lazfs_finish_tmpfile(cstat.tmppath, &cstat.fd, &cstat.tmpfd);
+		if (cstat.lastref)
+			lazfs_finish_tmpfile(cstat.tmppath, &cstat.fd, &cstat.tmpfd);
 		cache_remove(cache, path);
 		cache_unlock(cache);
 	} else {
