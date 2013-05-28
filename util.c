@@ -71,8 +71,8 @@ lazfs_error(const char *str)
 	return ret;
 }
 
-int
-lazfs_decompress(int sfd, int dfd)
+static int
+lazfs_processfile(int sfd, int dfd, char compress)
 {
 	LASReaderH reader = NULL;
 	LASWriterH writer = NULL;
@@ -80,7 +80,7 @@ lazfs_decompress(int sfd, int dfd)
 	LASPointH p = NULL;
 	int ret = 0;
 
-	log_debug("\ndecompressing file: sfd: \"%d\", dfd:\"%d\"\n", sfd, dfd);
+	log_debug("\nprocessing file: sfd: \"%d\", dfd:\"%d\"\n", sfd, dfd);
 
 	reader = LASReader_CreateFd(sfd);
 	if (reader == NULL) {
@@ -100,7 +100,7 @@ lazfs_decompress(int sfd, int dfd)
 		goto cleanup;
 	}
 
-	if (LASHeader_SetCompressed(wheader, 0) != 0) {
+	if (LASHeader_SetCompressed(wheader, compress) != 0) {
 		log_error("    ERROR: LASHeader_SetCompressed failed: %s\n",
 		LASError_GetLastErrorMsg());
 		ret = -ENOMEM; /* FIXME: What's more appropriate errno? */
@@ -115,7 +115,7 @@ lazfs_decompress(int sfd, int dfd)
 		goto cleanup;
 	}
 
-	/* Decompress point-by-point */
+	/* Process point-by-point */
 	p = LASReader_GetNextPoint(reader);
 	while (p) {
 		if (LASWriter_WritePoint(writer, p) != LE_None) {
@@ -143,6 +143,18 @@ cleanup:
 		LASReader_Destroy(reader);
 
 	return ret;
+}
+
+int
+lazfs_decompress(int sfd, int dfd)
+{
+	return lazfs_processfile(sfd, dfd, 0);
+}
+
+int
+lazfs_compress(int sfd, int dfd)
+{
+	return lazfs_processfile(sfd, dfd, 1);
 }
 
 int

@@ -40,6 +40,10 @@ lazfs_fullpath(char fpath[PATH_MAX], const char *path);
 int
 lazfs_decompress(int sfd, int dfd);
 
+/* Compresses file from source fd to destination fd */
+int
+lazfs_compress(int sfd, int dfd);
+
 /*
  * Prepare background decompressed tmpfile
  * 1. Open compressed "path" and return it's fd in "fd"
