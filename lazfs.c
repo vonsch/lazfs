@@ -59,7 +59,7 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 		  path, statbuf);
 	lazfs_fullpath(fpath, path);
 
-	if (lazfs_exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath, ".las")) {
 		/* We got request for .las file */
 		strncpy(fpath_laz, fpath, PATH_MAX);
 		fpath_laz[PATH_MAX - 1] = '\0';
@@ -415,7 +415,7 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 		  path, fi);
 	lazfs_fullpath(fpath, path);
 
-	if (lazfs_exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath, ".las")) {
 		/* We got request for .las file */
 
 		cache_lock(cache);
@@ -511,7 +511,7 @@ lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 	log_fi(fi);
 	lazfs_fullpath(fpath, path);
 
-	if (lazfs_exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath, ".las")) {
 		cache_lock(cache);
 		retstat = cache_get(cache, path, 1, &cstat);
 		cache_unlock(cache);
@@ -525,7 +525,7 @@ lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 	if (retstat < 0)
 		retstat = lazfs_error("lazfs_read read");
 
-	if (lazfs_exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath, ".las")) {
 		cache_lock(cache);
 		cache_remove(cache, path);
 		cache_unlock(cache);
@@ -561,7 +561,7 @@ lazfs_write(const char *path, const char *buf, size_t size, off_t offset,
 	log_fi(fi);
 	lazfs_fullpath(fpath, path);
 
-	if (lazfs_exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath, ".las")) {
 		cache_lock(cache);
 		retstat = cache_get(cache, path, 1, &cstat);
 		cache_unlock(cache);
@@ -681,7 +681,7 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 	// We need to close the file.  Had we allocated any resources
 	// (buffers etc) we'd need to free them here as well.
 
-	if (lazfs_exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath, ".las")) {
 		cache_lock(cache);
 		cache_get(cache, path, 0, &cstat);
 		/* NOTE: tmpfilename becomes invalid after cache_remove call. */
@@ -1070,7 +1070,7 @@ lazfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 		  path, mode, fi);
 	lazfs_fullpath(fpath, path);
 
-	if (lazfs_exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath, ".las")) {
 		strncpy(fpath_laz, fpath, PATH_MAX);
 		fpath_laz[PATH_MAX - 1] = '\0';
 		fpath_laz[strlen(fpath_laz) - 1] = 'z';
@@ -1169,7 +1169,7 @@ lazfs_fgetattr(const char *path, struct stat *statbuf, struct fuse_file_info *fi
 	log_fi(fi);
 	lazfs_fullpath(fpath, path);
 
-	if (lazfs_exec_hooks(fpath)) {
+	if (lazfs_exec_hooks(fpath, ".las")) {
 		cache_lock(cache);
 		retstat = cache_get(cache, path, 1, &cstat);
 		cache_unlock(cache);

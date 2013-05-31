@@ -30,7 +30,7 @@
  * decompressed to /tmp/ background file). Note that fpath _must_ be full path.
  */
 char
-lazfs_exec_hooks(const char *fpath);
+lazfs_exec_hooks(const char *fpath, const char *suffix);
 
 /* Returns full path of the file */
 void

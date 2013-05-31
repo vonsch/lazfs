@@ -20,12 +20,14 @@
 #include <unistd.h>
 
 char
-lazfs_exec_hooks(const char *fpath)
+lazfs_exec_hooks(const char *fpath, const char *suffix)
 {
 	size_t len;
 	int ret;
 	const char *laz_suffix;
 	struct stat stbuf;
+
+	assert(strlen(suffix) == 4);
 
 	/* Don't exec hooks if requested file exists */
 	ret = lstat(fpath, &stbuf);
@@ -38,7 +40,7 @@ lazfs_exec_hooks(const char *fpath)
 
 	laz_suffix = fpath + len - 4;
 	assert(laz_suffix >= fpath);
-	if (strncmp(laz_suffix, ".las", 4) == 0)
+	if (strncmp(laz_suffix, suffix, 4) == 0)
 		return 1;
 
 	return 0;
