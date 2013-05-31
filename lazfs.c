@@ -72,7 +72,7 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 		}
 
 		/* We must decompress file to get it's length, sigh */
-		retstat = lazfs_prepare_tmpfile(fpath_laz, tmppath, O_RDONLY, &fd, &tmpfd);
+		retstat = lazfs_prepare_tmpfile(fpath_laz, tmppath, O_RDONLY, -1, &fd, &tmpfd);
 		if (retstat != 0) {
 			log_error("lazfs_getattr: lazfs_prepare_tmpfile failed");
 			goto cleanup;
@@ -434,7 +434,7 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 		log_debug("\nlazfs_open: opening laz file \"%s\"\n", fpath_laz);
 
 		/* FIXME: We shouldn't ignore fi->flags */
-		retstat = lazfs_prepare_tmpfile(fpath_laz, tmppath, fi->flags, &fd, &tmpfd);
+		retstat = lazfs_prepare_tmpfile(fpath_laz, tmppath, fi->flags, -1, &fd, &tmpfd);
 		if (retstat != 0) {
 			log_error("lazfs_open: lazfs_prepare_tmpfile failed");
 			goto cleanup;

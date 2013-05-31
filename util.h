@@ -50,10 +50,14 @@ lazfs_compress(int sfd, int dfd);
  * 2. Create temporary file and return it's path in "tmppath" and it's fd in
  *    "tmpfd"
  *
+ * Either flags or mode can be -1. In case flags != -1, open() is called on
+ * path. In case mode != -1, creat() is called on path.
+ *
  * Returns 0 in case of success or -errno in case of failure.
  */
 int
-lazfs_prepare_tmpfile(const char *path, char *tmppath, int flags, int *fd, int *tmpfd);
+lazfs_prepare_tmpfile(const char *path, char *tmppath, int flags, int mode, int *fd,
+		      int *tmpfd);
 
 /*
  * Finish decompression and clean all temporary resources (i.e. temporary file).

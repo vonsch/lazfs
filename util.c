@@ -158,22 +158,32 @@ lazfs_compress(int sfd, int dfd)
 }
 
 int
-lazfs_prepare_tmpfile(const char *path, char *tmppath, int flags, int *fdp, int *tmpfdp)
+lazfs_prepare_tmpfile(const char *path, char *tmppath, int flags, int mode,
+		      int *fdp, int *tmpfdp)
 {
 	int fd = -1, tmpfd = -1, ret;
 
 	assert(path != NULL);
 	assert(tmppath != NULL);
+	assert(flags != -1 || mode != -1);
 	assert(fdp != NULL);
 	assert(tmpfdp != NULL);
 
 	log_debug("\nprepare_tmpfile: \"p: %s\", tmpp: \"%s\", fd: \"%d\", "
 		  "tmpfd: \"%d\"\n", path, tmppath, *fdp, *tmpfdp);
 
-	fd = open(path, flags);
-	if (fd < 0) {
-		ret = lazfs_error("prepare_tmpfile open");
-		goto cleanup;
+	if (flags != -1) {
+		fd = open(path, flags);
+		if (fd < 0) {
+			ret = lazfs_error("prepare_tmpfile open");
+			goto cleanup;
+		}
+	} else if (mode != -1) {
+		fd = creat(path, mode);
+		if (fd == -1) {
+			ret = lazfs_error("prepare_tmpfile creat");
+			goto cleanup;
+		}
 	}
 
 	tmpfd = mkstemp(tmppath);
