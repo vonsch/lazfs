@@ -553,20 +553,33 @@ lazfs_write(const char *path, const char *buf, size_t size, off_t offset,
 {
 	int retstat = 0;
 	char fpath[PATH_MAX];
+	laz_cache_t *cache = LAZFS_DATA->cache;
+	laz_cachestat_t cstat;
 
 	log_debug("\nlazfs_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 		  path, buf, size, offset, fi);
 	log_fi(fi);
 	lazfs_fullpath(fpath, path);
 
-	if (lazfs_exec_hooks(path)) {
-		/* We don't support writting, yet */
-		return -ENOSYS;
-	}
+	if (lazfs_exec_hooks(fpath)) {
+		cache_lock(cache);
+		retstat = cache_get(cache, path, 1, &cstat);
+		cache_unlock(cache);
+		assert(retstat == 0);
+		if (cstat.dirty == 0)
+			cache_dirty(cache, path);
 
-	retstat = pwrite(fi->fh, buf, size, offset);
-	if (retstat < 0)
-		retstat = lazfs_error("lazfs_write pwrite");
+		retstat = pwrite(cstat.tmpfd, buf, size, offset);
+		if (retstat < 0)
+			retstat = lazfs_error("lazfs_write pwrite");
+		cache_lock(cache);
+		cache_remove(cache, path);
+		cache_unlock(cache);
+	} else {
+		retstat = pwrite(fi->fh, buf, size, offset);
+		if (retstat < 0)
+			retstat = lazfs_error("lazfs_write pwrite");
+	}
 
 	return retstat;
 }
@@ -653,10 +666,12 @@ lazfs_flush(const char *path, struct fuse_file_info *fi)
 int
 lazfs_release(const char *path, struct fuse_file_info *fi)
 {
-	int ret, retstat = 0;
+	int ret, retstat = 0, compressfd = -1;
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	char fpath[PATH_MAX];
 	laz_cachestat_t cstat;
+	char cpath[PATH_MAX];
+	char fpath_laz[PATH_MAX];
 
 	log_debug("\nlazfs_release(path=\"%s\", fi=0x%08x)\n",
 		  path, fi);
@@ -670,8 +685,45 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 		cache_lock(cache);
 		cache_get(cache, path, 0, &cstat);
 		/* NOTE: tmpfilename becomes invalid after cache_remove call. */
-		if (cstat.lastref)
+		if (cstat.lastref) {
+			if (cstat.dirty) {
+				strncpy(fpath_laz, fpath, PATH_MAX);
+				fpath_laz[PATH_MAX - 1] = '\0';
+				fpath_laz[strlen(fpath_laz) - 1] = 'z';
+
+				/* FIXME: PATH_MAX can be too short */
+				ret = snprintf(cpath, PATH_MAX, "%s/lazfs.XXXXXX", LAZFS_DATA->rootdir);
+				if (ret + 1 + 6 > PATH_MAX) {
+					retstat = -ENAMETOOLONG;
+					goto cleanup;
+				}
+
+				compressfd = mkstemp(cpath);
+				if (compressfd == -1) {
+					retstat = -errno;
+					goto cleanup;
+				}
+
+				ret = lazfs_compress(cstat.tmpfd, compressfd);
+				if (ret != 0) {
+					retstat = ret;
+					goto cleanup;
+				}
+
+				ret = rename(cpath, fpath_laz);
+				if (ret != 0) {
+					retstat = -errno;
+					goto cleanup;
+				}
+			}
+cleanup:
+			if (compressfd != -1) {
+				ret = close(compressfd);
+				if (ret)
+					retstat = -ret;
+			}
 			lazfs_finish_tmpfile(cstat.tmppath, &cstat.fd, &cstat.tmpfd);
+		}
 		cache_remove(cache, path);
 		cache_unlock(cache);
 	} else {
@@ -679,7 +731,7 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 		if (ret)
 			retstat = ret;
 	}
-    
+
 	return retstat;
 }
 
@@ -1055,6 +1107,8 @@ cleanup:
 	if (tmpfd != -1)
 		close(tmpfd);
 	return retstat;
+
+	return -ENOSYS;
 }
 
 /*
