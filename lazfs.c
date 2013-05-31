@@ -1009,21 +1009,51 @@ int
 lazfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
 	int retstat = 0;
-	char fpath[PATH_MAX];
-	int fd;
+	char fpath[PATH_MAX], fpath_laz[PATH_MAX];
+	int fd = -1, tmpfd = -1;
+	char tmppath[] = "/tmp/lazfs.XXXXXX";
+	laz_cache_t *cache = LAZFS_DATA->cache;
 
 	log_debug("\nlazfs_create(path=\"%s\", mode=0%03o, fi=0x%08x)\n",
 		  path, mode, fi);
 	lazfs_fullpath(fpath, path);
 
-	fd = creat(fpath, mode);
-	if (fd < 0)
-		retstat = lazfs_error("lazfs_create creat");
+	if (lazfs_exec_hooks(fpath)) {
+		strncpy(fpath_laz, fpath, PATH_MAX);
+		fpath_laz[PATH_MAX - 1] = '\0';
+		fpath_laz[strlen(fpath_laz) - 1] = 'z';
+
+		log_debug("\nlazfs_create: creating laz file \"%s\"\n", fpath_laz);
+
+		/* FIXME: We shouldn't ignore fi->flags */
+		retstat = lazfs_prepare_tmpfile(fpath_laz, tmppath, -1, mode, &fd, &tmpfd);
+		if (retstat != 0) {
+			log_error("lazfs_open: lazfs_prepare_tmpfile failed");
+			goto cleanup;
+		}
+
+		retstat = cache_add(cache, path, tmppath, fd, tmpfd);
+		if (retstat != 0) {
+			log_error("lazfs_open: cache_add failed");
+			goto cleanup;
+		}
+	} else {
+		fd = creat(fpath, mode);
+		if (fd < 0)
+			retstat = lazfs_error("lazfs_create creat");
+	}
 
 	fi->fh = fd;
 
 	log_fi(fi);
 
+	return 0;
+
+cleanup:
+	if (fd != -1)
+		close(fd);
+	if (tmpfd != -1)
+		close(tmpfd);
 	return retstat;
 }
 
