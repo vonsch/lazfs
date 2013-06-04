@@ -901,6 +901,7 @@ lazfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
 	int retstat = 0;
 	DIR *dp;
 	struct dirent *de;
+	char path_las[PATH_MAX];
 
 	log_debug("\nlazfs_readdir(path=\"%s\", buf=0x%08x, filler=0x%08x, offset=%lld, fi=0x%08x)\n",
 		  path, buf, filler, offset, fi);
@@ -922,10 +923,22 @@ lazfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset,
 	// returns something non-zero.  The first case just means I've
 	// read the whole directory; the second means the buffer is full.
 	do {
-		log_debug("calling filler with name %s\n", de->d_name);
-		if (filler(buf, de->d_name, NULL, 0) != 0) {
-			log_error("    ERROR lazfs_readdir filler:  buffer full");
-			return -ENOMEM;
+		if (lazfs_exec_hooks(de->d_name, ".laz")) {
+			strncpy(path_las, de->d_name, PATH_MAX);
+			path_las[PATH_MAX - 1] = '\0';
+			path_las[strlen(path_las) - 1] = 's';
+
+			log_debug("calling filler with name %s\n", path_las);
+			if (filler(buf, path_las, NULL, 0) != 0) {
+				log_error("    ERROR lazfs_readdir filler:  buffer full");
+				return -ENOMEM;
+			}
+		} else {
+			log_debug("calling filler with name %s\n", de->d_name);
+			if (filler(buf, de->d_name, NULL, 0) != 0) {
+				log_error("    ERROR lazfs_readdir filler:  buffer full");
+				return -ENOMEM;
+			}
 		}
 	} while ((de = readdir(dp)) != NULL);
 
