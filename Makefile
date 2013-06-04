@@ -1,5 +1,5 @@
-lazfs : lazfs.o log.o util.o cache.o
-	gcc -g -o lazfs lazfs.o util.o log.o cache.o `pkg-config fuse --libs` -llas_c
+lazfs : lazfs.o log.o util.o cache.o compress_laz.o
+	gcc -g -o lazfs lazfs.o util.o log.o cache.o compress_laz.o `pkg-config fuse --libs` -llas_c
 
 lazfs.o : lazfs.c log.h params.h
 	gcc -g -Wall `pkg-config fuse --cflags` -c lazfs.c
@@ -12,6 +12,9 @@ log.o : log.c log.h params.h
 
 cache.o: cache.c cache.h
 	gcc -g -Wall -c cache.c
+
+compress_laz.o: compress_laz.h compress_laz.c
+	gcc -g -Wall `pkg-config fuse --cflags` -c compress_laz.c
 
 clean:
 	rm -f lazfs *.o

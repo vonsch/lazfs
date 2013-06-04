@@ -9,11 +9,11 @@
 
 #include "params.h"
 #include "cache.h"
+#include "compress_laz.h"
 #include "log.h"
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
-#include <liblas/capi/liblas.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -73,90 +73,16 @@ lazfs_error(const char *str)
 	return ret;
 }
 
-static int
-lazfs_processfile(int sfd, int dfd, char compress)
-{
-	LASReaderH reader = NULL;
-	LASWriterH writer = NULL;
-	LASHeaderH wheader = NULL;
-	LASPointH p = NULL;
-	int ret = 0;
-
-	log_debug("\nprocessing file: sfd: \"%d\", dfd:\"%d\"\n", sfd, dfd);
-
-	reader = LASReader_CreateFd(sfd);
-	if (reader == NULL) {
-		log_error("    ERROR: LASReader_CreateFd failed: %s\n",
-		LASError_GetLastErrorMsg());
-		/* FIXME: We should return more codes */
-		ret = -ENOMEM;
-		goto cleanup;
-	}
-
-	wheader = LASHeader_Copy(LASReader_GetHeader(reader));
-	if (wheader == NULL) {
-		log_error("    ERROR: LASHeader_Copy failed: %s\n",
-		LASError_GetLastErrorMsg());
-		/* FIXME: Return more codes? */
-		ret = -ENOMEM;
-		goto cleanup;
-	}
-
-	if (LASHeader_SetCompressed(wheader, compress) != 0) {
-		log_error("    ERROR: LASHeader_SetCompressed failed: %s\n",
-		LASError_GetLastErrorMsg());
-		ret = -ENOMEM; /* FIXME: What's more appropriate errno? */
-		goto cleanup;
-	}
-
-	writer = LASWriter_CreateFd(dfd, wheader, LAS_MODE_WRITE);
-	if (writer == NULL) {
-		log_error("    ERROR: LASWriter_CreateFd failed: %s\n",
-		LASError_GetLastErrorMsg());
-		ret = -ENOMEM;
-		goto cleanup;
-	}
-
-	/* Process point-by-point */
-	p = LASReader_GetNextPoint(reader);
-	while (p) {
-		if (LASWriter_WritePoint(writer, p) != LE_None) {
-			log_error("    ERROR: LASWriter_WritePoint failed: %s\n",
-			LASError_GetLastErrorMsg());
-			/* FIXME: Is there more appropriate errno? */
-			ret = -ENOSPC;
-			goto cleanup;
-		}
-		p = LASReader_GetNextPoint(reader);
-	}
-
-	LASWriter_Destroy(writer);
-	LASHeader_Destroy(wheader);
-	LASReader_Destroy(reader);
-
-	return 0;
-
-cleanup:
-	if (writer != NULL)
-		LASWriter_Destroy(writer);
-	if (wheader != NULL)
-		LASHeader_Destroy(wheader);
-	if (reader != NULL)
-		LASReader_Destroy(reader);
-
-	return ret;
-}
-
 int
 lazfs_decompress(int sfd, int dfd)
 {
-	return lazfs_processfile(sfd, dfd, 0);
+	return laz_decompress(sfd, dfd);
 }
 
 int
 lazfs_compress(int sfd, int dfd)
 {
-	return lazfs_processfile(sfd, dfd, 1);
+	return laz_compress(sfd, dfd);
 }
 
 int
