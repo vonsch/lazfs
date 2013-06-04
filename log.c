@@ -43,23 +43,35 @@ FILE *log_open()
     return logfile;
 }
 
+void log_errorv(const char *format, va_list args)
+{
+    vfprintf(LAZFS_DATA->logfile, format, args);
+}
+
 void log_error(const char *format, ...)
 {
     va_list ap;
     va_start(ap, format);
 
-    vfprintf(LAZFS_DATA->logfile, format, ap);
+    log_errorv(format, ap);
+    va_end(ap);
+}
+
+void log_debugv(const char *format, va_list args)
+{
+    if (!debug)
+	return;
+
+    vfprintf(LAZFS_DATA->logfile, format, args);
 }
 
 void log_debug(const char *format, ...)
 {
     va_list ap;
 
-    if (!debug)
-	return;
-
     va_start(ap, format);
-    vfprintf(LAZFS_DATA->logfile, format, ap);
+    log_debugv(format, ap);
+    va_end(ap);
 }
     
 // struct fuse_file_info keeps information about files (surprise!).

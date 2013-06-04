@@ -24,7 +24,9 @@ void log_stat(struct stat *si);
 void log_statvfs(struct statvfs *sv);
 void log_utime(struct utimbuf *buf);
 
+void log_debugv(const char *format, va_list args);
 void log_debug(const char *format, ...);
+void log_errorv(const char *format, va_list args);
 void log_error(const char *format, ...);
 
 // Report errors to logfile and give -errno to caller
