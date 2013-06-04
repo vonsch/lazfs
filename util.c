@@ -131,8 +131,8 @@ lazfs_processfile(int sfd, int dfd, char compress)
 	}
 
 	LASWriter_Destroy(writer);
-	LASReader_Destroy(reader);
 	LASHeader_Destroy(wheader);
+	LASReader_Destroy(reader);
 
 	return 0;
 
