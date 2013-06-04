@@ -10,6 +10,7 @@
 #include "params.h"
 #include "cache.h"
 #include "compress_laz.h"
+#include "compress_lrzip.h"
 #include "log.h"
 #include "util.h"
 #include <assert.h>
@@ -76,13 +77,13 @@ lazfs_error(const char *str)
 int
 lazfs_decompress(int sfd, int dfd)
 {
-	return laz_decompress(sfd, dfd);
+	return lazfs_lrzip_decompress(sfd, dfd);
 }
 
 int
 lazfs_compress(int sfd, int dfd)
 {
-	return laz_compress(sfd, dfd);
+	return lazfs_lrzip_compress(sfd, dfd);
 }
 
 int
