@@ -767,6 +767,8 @@ lazfs_fsync(const char *path, int datasync, struct fuse_file_info *fi)
 int
 lazfs_setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
 {
+	return -ENOTSUP;
+#if 0
 	int retstat = 0;
 	char fpath[PATH_MAX];
 
@@ -779,12 +781,15 @@ lazfs_setxattr(const char *path, const char *name, const char *value, size_t siz
 		retstat = lazfs_error("lazfs_setxattr lsetxattr");
 
 	return retstat;
+#endif
 }
 
 /* Get extended attributes */
 int
 lazfs_getxattr(const char *path, const char *name, char *value, size_t size)
 {
+	return -ENOTSUP;
+#if 0
 	int retstat = 0;
 	char fpath[PATH_MAX];
 
@@ -799,12 +804,15 @@ lazfs_getxattr(const char *path, const char *name, char *value, size_t size)
 		log_debug("    value = \"%s\"\n", value);
 
 	return retstat;
+#endif
 }
 
 /* List extended attributes */
 int
 lazfs_listxattr(const char *path, char *list, size_t size)
 {
+	return -ENOTSUP;
+#if 0
 	int retstat = 0;
 	char fpath[PATH_MAX];
 	char *ptr;
@@ -822,12 +830,15 @@ lazfs_listxattr(const char *path, char *list, size_t size)
 		log_debug("    \"%s\"\n", ptr);
 
 	return retstat;
+#endif
 }
 
 /* Remove extended attributes */
 int
 lazfs_removexattr(const char *path, const char *name)
 {
+	return -ENOTSUP;
+#if 0
 	int retstat = 0;
 	char fpath[PATH_MAX];
 
@@ -840,6 +851,7 @@ lazfs_removexattr(const char *path, const char *name)
 		retstat = lazfs_error("lazfs_removexattr lrmovexattr");
 
 	return retstat;
+#endif
 }
 
 /*
