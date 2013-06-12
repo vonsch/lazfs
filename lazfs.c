@@ -221,12 +221,21 @@ lazfs_unlink(const char *path)
 {
 	int retstat = 0;
 	char fpath[PATH_MAX];
+	char path_las[PATH_MAX];
 
 	log_debug("lazfs_unlink(path=\"%s\")\n",
 		  path);
 	lazfs_fullpath(fpath, path);
 
-	retstat = unlink(fpath);
+	if (lazfs_exec_hooks(fpath, ".laz")) {
+		strncpy(path_las, fpath, PATH_MAX);
+		path_las[PATH_MAX - 1] = '\0';
+		path_las[strlen(path_las) - 1] = 's';
+
+		retstat = unlink(path_las);
+	} else
+		retstat = unlink(fpath);
+
 	if (retstat < 0)
 		retstat = lazfs_error("lazfs_unlink unlink");
 
