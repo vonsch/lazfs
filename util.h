@@ -66,4 +66,16 @@ lazfs_prepare_tmpfile(const char *path, char *tmppath, int flags, int mode, int 
 void
 lazfs_finish_tmpfile(char *tmppath, int *fd, int *tmpfd);
 
+typedef struct {
+	uid_t	uid;
+	gid_t	gid;
+} lazfs_ugid_t;
+
+/* Set and restore user/group ID per user which accessing filesystem */
+void
+lazfs_setugid(lazfs_ugid_t *ugid);
+
+void
+lazfs_restoreugid(const lazfs_ugid_t *ugid);
+
 #endif

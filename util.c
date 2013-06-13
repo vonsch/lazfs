@@ -17,6 +17,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/fsuid.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -160,3 +161,21 @@ lazfs_finish_tmpfile(char *tmppath, int *fd, int *tmpfd)
 	ret = unlink(tmppath);
 	assert(ret == 0); /* Ditto */
 }
+
+void
+lazfs_setugid(lazfs_ugid_t *ugid)
+{
+	struct fuse_context *fc;
+
+	fc = fuse_get_context();
+	ugid->uid = setfsuid(fc->uid);
+	ugid->gid = setfsgid(fc->gid);
+}
+
+void
+lazfs_restoreugid(const lazfs_ugid_t *ugid)
+{
+	setfsuid(ugid->uid);
+	setfsgid(ugid->gid);
+}
+
