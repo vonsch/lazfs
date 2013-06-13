@@ -785,61 +785,81 @@ lazfs_fsync(const char *path, int datasync, struct fuse_file_info *fi)
 int
 lazfs_setxattr(const char *path, const char *name, const char *value, size_t size, int flags)
 {
-	return -ENOTSUP;
-#if 0
 	int retstat = 0;
 	char fpath[PATH_MAX];
+	char fpath_laz[PATH_MAX];
 
 	log_debug("\nlazfs_setxattr(path=\"%s\", name=\"%s\", value=\"%s\", size=%d, flags=0x%08x)\n",
 		  path, name, value, size, flags);
+
 	lazfs_fullpath(fpath, path);
 
-	retstat = lsetxattr(fpath, name, value, size, flags);
+	if (lazfs_exec_hooks(fpath, ".las")) {
+		/* We got request for .las file */
+		strncpy(fpath_laz, fpath, PATH_MAX);
+		fpath_laz[PATH_MAX - 1] = '\0';
+		fpath_laz[strlen(fpath_laz) - 1] = 'z';
+		retstat = lsetxattr(fpath_laz, name, value, size, flags);
+	} else
+		retstat = lsetxattr(fpath, name, value, size, flags);
+	
 	if (retstat < 0)
 		retstat = lazfs_error("lazfs_setxattr lsetxattr");
 
 	return retstat;
-#endif
 }
 
 /* Get extended attributes */
 int
 lazfs_getxattr(const char *path, const char *name, char *value, size_t size)
 {
-	return -ENOTSUP;
-#if 0
 	int retstat = 0;
 	char fpath[PATH_MAX];
+	char fpath_laz[PATH_MAX];
 
 	log_debug("\nlazfs_getxattr(path = \"%s\", name = \"%s\", value = 0x%08x, size = %d)\n",
 		  path, name, value, size);
 	lazfs_fullpath(fpath, path);
 
-	retstat = lgetxattr(fpath, name, value, size);
+	if (lazfs_exec_hooks(fpath, ".las")) {
+		/* We got request for .las file */
+		strncpy(fpath_laz, fpath, PATH_MAX);
+		fpath_laz[PATH_MAX - 1] = '\0';
+		fpath_laz[strlen(fpath_laz) - 1] = 'z';
+		retstat = lgetxattr(fpath_laz, name, value, size);
+	} else
+		retstat = lgetxattr(fpath, name, value, size);
+	
 	if (retstat < 0)
 		retstat = lazfs_error("lazfs_getxattr lgetxattr");
 	else
 		log_debug("    value = \"%s\"\n", value);
 
 	return retstat;
-#endif
 }
 
 /* List extended attributes */
 int
 lazfs_listxattr(const char *path, char *list, size_t size)
 {
-	return -ENOTSUP;
-#if 0
 	int retstat = 0;
 	char fpath[PATH_MAX];
+	char fpath_laz[PATH_MAX];
 	char *ptr;
 
 	log_debug("lazfs_listxattr(path=\"%s\", list=0x%08x, size=%d)\n",
 		  path, list, size);
 	lazfs_fullpath(fpath, path);
 
-	retstat = llistxattr(fpath, list, size);
+	if (lazfs_exec_hooks(fpath, ".las")) {
+		/* We got request for .las file */
+		strncpy(fpath_laz, fpath, PATH_MAX);
+		fpath_laz[PATH_MAX - 1] = '\0';
+		fpath_laz[strlen(fpath_laz) - 1] = 'z';
+		retstat = llistxattr(fpath_laz, list, size);
+	} else
+		retstat = llistxattr(fpath, list, size);
+	
 	if (retstat < 0)
 		retstat = lazfs_error("lazfs_listxattr llistxattr");
 
@@ -848,28 +868,33 @@ lazfs_listxattr(const char *path, char *list, size_t size)
 		log_debug("    \"%s\"\n", ptr);
 
 	return retstat;
-#endif
 }
 
 /* Remove extended attributes */
 int
 lazfs_removexattr(const char *path, const char *name)
 {
-	return -ENOTSUP;
-#if 0
 	int retstat = 0;
 	char fpath[PATH_MAX];
+	char fpath_laz[PATH_MAX];
 
 	log_debug("\nlazfs_removexattr(path=\"%s\", name=\"%s\")\n",
 		  path, name);
 	lazfs_fullpath(fpath, path);
 
-	retstat = lremovexattr(fpath, name);
+	if (lazfs_exec_hooks(fpath, ".las")) {
+		/* We got request for .las file */
+		strncpy(fpath_laz, fpath, PATH_MAX);
+		fpath_laz[PATH_MAX - 1] = '\0';
+		fpath_laz[strlen(fpath_laz) - 1] = 'z';
+		retstat = lremovexattr(fpath_laz, name);
+	} else
+		retstat = lremovexattr(fpath, name);
+	
 	if (retstat < 0)
 		retstat = lazfs_error("lazfs_removexattr lrmovexattr");
 
 	return retstat;
-#endif
 }
 
 /*
