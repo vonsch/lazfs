@@ -77,13 +77,13 @@ lazfs_error(const char *str)
 int
 lazfs_decompress(int sfd, int dfd)
 {
-	return lazfs_lrzip_decompress(sfd, dfd);
+	return lazfs_laz_decompress(sfd, dfd);
 }
 
 int
 lazfs_compress(int sfd, int dfd)
 {
-	return lazfs_lrzip_compress(sfd, dfd);
+	return lazfs_laz_compress(sfd, dfd);
 }
 
 int
