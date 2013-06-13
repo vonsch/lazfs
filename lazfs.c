@@ -176,11 +176,13 @@ lazfs_mknod(const char *path, mode_t mode, dev_t dev)
 {
 	int retstat = 0;
 	char fpath[PATH_MAX];
+	lazfs_ugid_t ugid;
     
 	log_debug("\nlazfs_mknod(path=\"%s\", mode=0%3o, dev=%lld)\n",
 		  path, mode, dev);
 	lazfs_fullpath(fpath, path);
-    
+
+	lazfs_setugid(&ugid);
 	// On Linux this could just be 'mknod(path, mode, rdev)' but this
 	// is more portable
 	if (S_ISREG(mode)) {
@@ -203,6 +205,8 @@ lazfs_mknod(const char *path, mode_t mode, dev_t dev)
 				retstat = lazfs_error("lazfs_mknod mknod");
 	}
 
+	lazfs_restoreugid(&ugid);
+
 	return retstat;
 }
 
@@ -212,14 +216,19 @@ lazfs_mkdir(const char *path, mode_t mode)
 {
 	int retstat = 0;
 	char fpath[PATH_MAX];
+	lazfs_ugid_t ugid;
 
 	log_debug("\nlazfs_mkdir(path=\"%s\", mode=0%3o)\n",
 		  path, mode);
 	lazfs_fullpath(fpath, path);
 
+	lazfs_setugid(&ugid);
+
 	retstat = mkdir(fpath, mode);
 	if (retstat < 0)
 		retstat = lazfs_error("lazfs_mkdir mkdir");
+
+	lazfs_restoreugid(&ugid);
 
 	return retstat;
 }
@@ -1141,10 +1150,13 @@ lazfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 	int fd = -1, tmpfd = -1;
 	char tmppath[] = "/tmp/lazfs.XXXXXX";
 	laz_cache_t *cache = LAZFS_DATA->cache;
+	lazfs_ugid_t ugid;
 
 	log_debug("\nlazfs_create(path=\"%s\", mode=0%03o, fi=0x%08x)\n",
 		  path, mode, fi);
 	lazfs_fullpath(fpath, path);
+
+	lazfs_setugid(&ugid);
 
 	if (lazfs_exec_hooks(fpath, ".las")) {
 		strncpy(fpath_laz, fpath, PATH_MAX);
@@ -1171,6 +1183,8 @@ lazfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 			retstat = lazfs_error("lazfs_create creat");
 	}
 
+	lazfs_restoreugid(&ugid);
+
 	fi->fh = fd;
 
 	log_fi(fi);
@@ -1178,6 +1192,7 @@ lazfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 	return 0;
 
 cleanup:
+	lazfs_restoreugid(&ugid);
 	if (fd != -1)
 		close(fd);
 	if (tmpfd != -1)
@@ -1339,6 +1354,7 @@ main(int argc, char *argv[])
 	int fuse_stat;
 	struct lazfs_state *lazfs_data;
 
+#if 0
 	// bbfs doesn't do any access checking on its own (the comment
 	// blocks in fuse.h mention some of the functions that need
 	// accesses checked -- but note there are other functions, like
@@ -1352,6 +1368,7 @@ main(int argc, char *argv[])
 		fprintf(stderr, "Running BBFS as root opens unnacceptable security holes\n");
 		return 1;
 	}
+#endif
 
 	// Perform some sanity checking on the command line:  make sure
 	// there are enough arguments, and that neither of the last two
