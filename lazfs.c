@@ -52,8 +52,10 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 	char fpath_laz[PATH_MAX];
 	char tmppath[] = "/tmp/lazfs.XXXXXX";
 	char decompressed = 0;
-	int fd = -1, tmpfd;
+	int fd = -1, tmpfd = -1;
 	struct stat tmpstatbuf;
+	laz_cache_t *cache = LAZFS_DATA->cache;
+	char locked = 0;
 
 	log_debug("\nlazfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
 		  path, statbuf);
@@ -64,6 +66,9 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 		strncpy(fpath_laz, fpath, PATH_MAX);
 		fpath_laz[PATH_MAX - 1] = '\0';
 		fpath_laz[strlen(fpath_laz) - 1] = 'z';
+
+		cache_lock(cache);
+		locked = 1;
 
 		retstat = lstat(fpath_laz, statbuf);
 		if (retstat != 0) {
@@ -93,6 +98,8 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 			retstat = lazfs_error("lazfs_getattr tmpfile lstat");
 			goto cleanup;
 		}
+		cache_unlock(cache);
+		locked = 0;
 
 		/* Merge attributes to output statbuf */
 		statbuf->st_size = tmpstatbuf.st_size;
@@ -111,6 +118,8 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 	retstat = 0;
 
 cleanup:
+	if (locked)
+		cache_unlock(cache);
 	if (decompressed)
 		lazfs_finish_tmpfile(tmppath, &fd, &tmpfd);
 	if (fd != -1)
@@ -227,10 +236,10 @@ lazfs_unlink(const char *path)
 		  path);
 	lazfs_fullpath(fpath, path);
 
-	if (lazfs_exec_hooks(fpath, ".laz")) {
+	if (lazfs_exec_hooks(fpath, ".las")) {
 		strncpy(path_las, fpath, PATH_MAX);
 		path_las[PATH_MAX - 1] = '\0';
-		path_las[strlen(path_las) - 1] = 's';
+		path_las[strlen(path_las) - 1] = 'z';
 
 		retstat = unlink(path_las);
 	} else
@@ -1066,12 +1075,20 @@ lazfs_access(const char *path, int mask)
 {
 	int retstat = 0;
 	char fpath[PATH_MAX];
+	char path_las[PATH_MAX];
 
 	log_debug("\nlazfs_access(path=\"%s\", mask=0%o)\n",
 		  path, mask);
 	lazfs_fullpath(fpath, path);
 
-	retstat = access(fpath, mask);
+	if (lazfs_exec_hooks(fpath, ".las")) {
+		strncpy(path_las, fpath, PATH_MAX);
+		path_las[PATH_MAX - 1] = '\0';
+		path_las[strlen(path_las) - 1] = 'z';
+
+		retstat = access(path_las, mask);
+	} else
+		retstat = access(fpath, mask);
 
 	if (retstat < 0)
 		retstat = lazfs_error("lazfs_access access");
