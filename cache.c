@@ -28,10 +28,10 @@ struct file_entry {
 	LIST_ENTRY(file_entry) link;
 };
 
-typedef struct laz_cache {
+struct laz_cache {
 	pthread_mutex_t lock;
 	LIST_HEAD(file_entries, file_entry) entries;
-} laz_cache_t;
+};
 
 static void
 file_entry_destroy(file_entry_t **entryp)
