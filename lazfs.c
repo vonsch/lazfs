@@ -873,8 +873,9 @@ lazfs_listxattr(const char *path, char *list, size_t size)
 		retstat = lazfs_error("lazfs_listxattr llistxattr");
 
 	log_debug("    returned attributes (length %d):\n", retstat);
-	for (ptr = list; ptr < list + retstat; ptr += strlen(ptr)+1)
-		log_debug("    \"%s\"\n", ptr);
+	if (size != 0 && list != NULL)
+		for (ptr = list; ptr < list + retstat; ptr += strlen(ptr)+1)
+			log_debug("    \"%s\"\n", ptr);
 
 	return retstat;
 }
