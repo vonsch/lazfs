@@ -14,11 +14,13 @@
 #include "log.h"
 #include "util.h"
 #include <assert.h>
+#include <attr/xattr.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/fsuid.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 char
@@ -177,5 +179,31 @@ lazfs_restoreugid(const lazfs_ugid_t *ugid)
 {
 	setfsuid(ugid->uid);
 	setfsgid(ugid->gid);
+}
+
+#define SIZEATTR "lazfs.size"
+
+int
+lazfs_setsize(const char *path, off_t size)
+{
+	int ret;
+
+	ret = setxattr(path, SIZEATTR, &size, sizeof(size), 0);
+	if (ret)
+		ret = lazfs_error("lazfs_setsize setxattr");
+
+	return ret;
+}
+
+int
+lazfs_getsize(const char *path, off_t *size)
+{
+	int ret;
+
+	ret = getxattr(path, SIZEATTR, size, sizeof(size));
+	if (ret)
+		ret = lazfs_error("lazfs_getsize getxattr");
+
+	return ret;
 }
 

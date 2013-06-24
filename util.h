@@ -78,4 +78,10 @@ lazfs_setugid(lazfs_ugid_t *ugid);
 void
 lazfs_restoreugid(const lazfs_ugid_t *ugid);
 
+int
+lazfs_setsize(const char *path, off_t size);
+
+int
+lazfs_getsize(const char *path, off_t *size);
+
 #endif
