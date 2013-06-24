@@ -709,6 +709,24 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 					goto cleanup;
 				}
 
+				ret = fstat(cstat.fd, &statbuf);
+				if (ret != 0) {
+					retstat = -errno;
+					goto cleanup;
+				}
+
+				ret = fchown(compressfd, statbuf.st_uid, statbuf.st_gid);
+				if (ret != 0) {
+					retstat = -errno;
+					goto cleanup;
+				}
+
+				ret = fchmod(compressfd, statbuf.st_mode);
+				if (ret != 0) {
+					retstat = -errno;
+					goto cleanup;
+				}
+
 				ret = rename(cpath, fpath_laz);
 				if (ret != 0) {
 					retstat = -errno;
