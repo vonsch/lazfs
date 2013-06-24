@@ -181,7 +181,7 @@ lazfs_restoreugid(const lazfs_ugid_t *ugid)
 	setfsgid(ugid->gid);
 }
 
-#define SIZEATTR "lazfs.size"
+#define SIZEATTR "user.lazfssize"
 
 int
 lazfs_setsize(const char *path, off_t size)
@@ -189,7 +189,7 @@ lazfs_setsize(const char *path, off_t size)
 	int ret;
 
 	ret = setxattr(path, SIZEATTR, &size, sizeof(size), 0);
-	if (ret)
+	if (ret == -1)
 		ret = lazfs_error("lazfs_setsize setxattr");
 
 	return ret;
@@ -201,8 +201,10 @@ lazfs_getsize(const char *path, off_t *size)
 	int ret;
 
 	ret = getxattr(path, SIZEATTR, size, sizeof(size));
-	if (ret)
+	if (ret == -1)
 		ret = lazfs_error("lazfs_getsize getxattr");
+	else
+		ret = 0;
 
 	return ret;
 }

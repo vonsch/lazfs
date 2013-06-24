@@ -50,12 +50,9 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 	int retstat = 0;
 	char fpath[PATH_MAX];
 	char fpath_laz[PATH_MAX];
-	char tmppath[] = "/tmp/lazfs.XXXXXX";
-	char decompressed = 0;
-	int fd = -1, tmpfd = -1;
-	struct stat tmpstatbuf;
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	char locked = 0;
+	off_t size;
 
 	log_debug("\nlazfs_getattr(path=\"%s\", statbuf=0x%08x)\n",
 		  path, statbuf);
@@ -76,36 +73,14 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 			goto cleanup;
 		}
 
-		/* We must decompress file to get it's length, sigh */
-		retstat = lazfs_prepare_tmpfile(fpath_laz, tmppath, O_RDONLY, -1, &fd, &tmpfd);
-		if (retstat != 0) {
-			log_error("lazfs_getattr: lazfs_prepare_tmpfile failed");
+		retstat = lazfs_getsize(fpath_laz, &size);
+		if (retstat != 0)
 			goto cleanup;
-		}
 
-		decompressed = 1;
-
-		retstat = lazfs_decompress(fd, tmpfd);
-		if (retstat != 0) {
-			log_error("lazfs_getattr: lazfs_decompress decompress failed");
-			goto cleanup;
-		}
-
-		/* TODO: Cache file here */
-
-		retstat = lstat(tmppath, &tmpstatbuf);
-		if (retstat != 0) {
-			retstat = lazfs_error("lazfs_getattr tmpfile lstat");
-			goto cleanup;
-		}
 		cache_unlock(cache);
 		locked = 0;
 
-		/* Merge attributes to output statbuf */
-		statbuf->st_size = tmpstatbuf.st_size;
-		statbuf->st_atime = tmpstatbuf.st_atime;
-		statbuf->st_mtime = tmpstatbuf.st_mtime;
-		statbuf->st_ctime = tmpstatbuf.st_ctime;
+		statbuf->st_size = size;
 	} else {
 		retstat = lstat(fpath, statbuf);
 		if (retstat != 0) {
@@ -120,10 +95,6 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 cleanup:
 	if (locked)
 		cache_unlock(cache);
-	if (decompressed)
-		lazfs_finish_tmpfile(tmppath, &fd, &tmpfd);
-	if (fd != -1)
-		close(fd);
 
 	return retstat;
 }
@@ -699,6 +670,7 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 	laz_cachestat_t cstat;
 	char cpath[PATH_MAX];
 	char fpath_laz[PATH_MAX];
+	struct stat statbuf;
 
 	log_debug("\nlazfs_release(path=\"%s\", fi=0x%08x)\n",
 		  path, fi);
@@ -742,6 +714,16 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 					retstat = -errno;
 					goto cleanup;
 				}
+
+				ret = fstat(cstat.tmpfd, &statbuf);
+				if (ret != 0) {
+					retstat = -errno;
+					goto cleanup;
+				}
+
+				retstat = lazfs_setsize(fpath_laz, statbuf.st_size);
+				if (retstat != 0)
+					goto cleanup;
 			}
 cleanup:
 			if (compressfd != -1) {
