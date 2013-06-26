@@ -375,12 +375,21 @@ lazfs_utime(const char *path, struct utimbuf *ubuf)
 {
 	int retstat = 0;
 	char fpath[PATH_MAX];
+	char path_las[PATH_MAX];
 
 	log_debug("\nlazfs_utime(path=\"%s\", ubuf=0x%08x)\n",
 		  path, ubuf);
 	lazfs_fullpath(fpath, path);
 
-	retstat = utime(fpath, ubuf);
+	if (lazfs_exec_hooks(fpath, ".las")) {
+		strncpy(path_las, fpath, PATH_MAX);
+		path_las[PATH_MAX - 1] = '\0';
+		path_las[strlen(path_las) - 1] = 'z';
+
+		retstat = utime(path_las, ubuf);
+	} else
+		retstat = utime(fpath, ubuf);
+
 	if (retstat < 0)
 		retstat = lazfs_error("lazfs_utime utime");
 
