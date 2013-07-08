@@ -30,9 +30,9 @@ laz_processfile(int sfd, int dfd, char compress)
 		goto cleanup;
 	}
 
-	wheader = LASHeader_Copy(LASReader_GetHeader(reader));
+	wheader = LASReader_GetHeader(reader);
 	if (wheader == NULL) {
-		log_error("    ERROR: LASHeader_Copy failed: %s\n",
+		log_error("    ERROR: LASReaded_GetHeader failed: %s\n",
 		LASError_GetLastErrorMsg());
 		/* FIXME: Return more codes? */
 		ret = -ENOMEM;
