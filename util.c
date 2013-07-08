@@ -62,9 +62,10 @@ lazfs_fullpath(char fpath[PATH_MAX], const char *path)
 {
 	strcpy(fpath, LAZFS_DATA->rootdir);
 	strncat(fpath, path, PATH_MAX); /* FIXME: long paths will break here */
-
+#if 0
 	log_debug("    lazfs_fullpath:  rootdir = \"%s\", path = \"%s\", fpath = \"%s\"\n",
 		  LAZFS_DATA->rootdir, path, fpath);
+#endif
 }
 
 int
