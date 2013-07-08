@@ -512,10 +512,11 @@ lazfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	char fpath[PATH_MAX];
 	laz_cachestat_t cstat;
-
+#if 0
 	log_debug("\nlazfs_read(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 		  path, buf, size, offset, fi);
 	log_fi(fi);
+#endif
 	lazfs_fullpath(fpath, path);
 
 	if (lazfs_exec_hooks(fpath, ".las")) {
@@ -562,10 +563,11 @@ lazfs_write(const char *path, const char *buf, size_t size, off_t offset,
 	char fpath[PATH_MAX];
 	laz_cache_t *cache = LAZFS_DATA->cache;
 	laz_cachestat_t cstat;
-
+#if 0
 	log_debug("\nlazfs_write(path=\"%s\", buf=0x%08x, size=%d, offset=%lld, fi=0x%08x)\n",
 		  path, buf, size, offset, fi);
 	log_fi(fi);
+#endif
 	lazfs_fullpath(fpath, path);
 
 	if (lazfs_exec_hooks(fpath, ".las")) {
