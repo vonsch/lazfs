@@ -1,0 +1,266 @@
+diff -up libLAS-1.7.0/CMakeLists.txt.geodis libLAS-1.7.0/CMakeLists.txt
+--- libLAS-1.7.0/CMakeLists.txt.geodis	2012-01-05 22:43:28.000000000 +0100
++++ libLAS-1.7.0/CMakeLists.txt	2013-07-23 16:15:57.991693368 +0200
+@@ -140,7 +140,7 @@ else()
+   # Recommended C++ compilation flags
+   # -Weffc++
+   set(LIBLAS_COMMON_CXX_FLAGS
+-	"-pedantic -ansi -Wall -Wpointer-arith -Wcast-align -Wcast-qual -Wfloat-equal -Wredundant-decls -Wno-long-long")
++	"-pedantic -Wall -Wpointer-arith -Wcast-align -Wcast-qual -Wfloat-equal -Wredundant-decls -Wno-long-long")
+ 
+   if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
+ 
+diff -up libLAS-1.7.0/include/liblas/capi/liblas.h.geodis libLAS-1.7.0/include/liblas/capi/liblas.h
+--- libLAS-1.7.0/include/liblas/capi/liblas.h.geodis	2012-01-05 22:43:28.000000000 +0100
++++ libLAS-1.7.0/include/liblas/capi/liblas.h	2013-07-23 16:15:57.991693368 +0200
+@@ -155,6 +155,16 @@ LAS_DLL LASReaderH LASReader_Create(cons
+ LAS_DLL LASReaderH LASReader_CreateWithHeader(  const char * filename, 
+                                                 LASHeaderH hHeader);
+ 
++/** Creates LASReaderH object that can be used to read LASHeaderH and LASPointH
++ * objects with. The passed file descriptor cannot be used by different process
++ * and cannot be opened for read/write by any other API function. Please note
++ * this function is not portable and only works on systems with GNU libstdc++
++ * library.
++ * @return opaque pointer to a LASReaderH instance.
++ * @param fd File descriptor opened for read
++ */
++LAS_DLL LASReaderH LASReader_CreateFd(int fd);
++
+ /** Reads the next available point on the LASReaderH instance.  If no point 
+  *  is available to read, NULL is returned.  If an error happens during 
+  *  the reading of the next available point, an error will be added to the 
+@@ -940,6 +950,20 @@ LAS_DLL char* LASHeader_GetXML(const LAS
+ */
+ LAS_DLL LASWriterH LASWriter_Create(const char* filename, const LASHeaderH hHeader, int mode);
+ 
++/** Creates a new LASWriterH for write operations on LAS files.  The file may 
++ *  be opened in either LAS_MODE_APPEND or LAS_MODE_WRITE, but the file cannot 
++ *  be open by another other operations (another LASReaderH or LASWriterH).
++ *  Please note this function is not portable and only works on systems with
++ *  GNU libstdc++ library.
++ *  @param fd File descriptor opened for write
++ *  @param hHeader an opaque pointer to a LASHeaderH that will be written to 
++ *  the file as part of the opening for write operation.
++ *  @param mode a mode value to denote whether to open for write or append 
++ *  operations.  Valid values are LAS_MODE_APPEND and LAS_MODE_WRITE.
++ *  @return opaque pointer to a LASWriterH instance.
++ */
++LAS_DLL LASWriterH LASWriter_CreateFd(int fd, const LASHeaderH hHeader, int mode);
++
+ /** Writes a point to the file.  The location of where the point is writen is 
+  *  determined by the mode the file is opened in, and what the last operation was.  
+  *  For example, if the file was opened for append, the next point would be written 
+diff -up libLAS-1.7.0/src/c_api.cpp.geodis libLAS-1.7.0/src/c_api.cpp
+--- libLAS-1.7.0/src/c_api.cpp.geodis	2012-01-05 22:43:28.000000000 +0100
++++ libLAS-1.7.0/src/c_api.cpp	2013-07-24 10:17:06.817609232 +0200
+@@ -83,6 +83,11 @@ typedef struct LASFilterHS *LASFilterH;
+ #include <typeinfo>
+ #include <vector>
+ 
++#ifdef __GNUC__
++#include <ext/stdio_filebuf.h>
++typedef __gnu_cxx::stdio_filebuf<char> GNUFilebuf;
++#endif
++
+ using namespace liblas;
+ 
+ #ifdef _WIN32
+@@ -299,6 +304,47 @@ LAS_DLL LASReaderH LASReader_CreateWithH
+ 
+ }
+ 
++LAS_DLL LASReaderH LASReader_CreateFd(int fd)
++{
++#ifdef __GNUC__
++    GNUFilebuf *filebuf = NULL;
++    std::istream *istrm = NULL;
++
++    filebuf = new GNUFilebuf(fd, std::ios::in | std::ios::binary);
++    if (filebuf == NULL) {
++        LASError_PushError(LE_Failure, "Failed to create stdio_filebuf",
++                           "LASReader_CreateFd");
++        return NULL;
++    }
++    try {
++        istrm = new std::istream(filebuf);
++    } catch (std::exception const& e)
++    {
++        if (istrm)
++            delete istrm; 
++        if (filebuf)
++            delete filebuf;
++        LASError_PushError(LE_Failure, e.what(), "LASReader_CreateFd");
++        return NULL;
++    }
++
++    try {
++        liblas::ReaderFactory f;
++        liblas::Reader* reader = new liblas::Reader(f.CreateWithStream(*istrm));
++        readers.insert(std::pair<liblas::Reader*, std::istream*>(reader, istrm));
++        return (LASReaderH) reader;
++    } catch (std::exception const& e)
++    {
++        LASError_PushError(LE_Failure, e.what(), "LASReader_CreateFd");
++        return NULL;
++    }
++#else
++    LASError_PushError(LE_Failure, "Function is implemented only on platforms "
++                                   "with GNU libstdc++", "LASReader_CreateFd");
++    return NULL;
++#endif
++}
++
+ LAS_DLL void LASReader_SetHeader(  LASReaderH hReader, const LASHeaderH hHeader) 
+ 
+ {
+@@ -315,6 +361,10 @@ LAS_DLL void LASReader_Destroy(LASReader
+ {
+     VALIDATE_LAS_POINTER0(hReader, "LASReader_Destroy");
+ 
++#ifdef __GNUC__
++    GNUFilebuf *filebuf = NULL;
++#endif
++
+     try { 
+         liblas::Reader* reader = (liblas::Reader*)hReader;
+         
+@@ -338,8 +388,21 @@ LAS_DLL void LASReader_Destroy(LASReader
+         liblas::Cleanup(istrm);
+             
+         readers.erase(reader);
++
++#ifdef __GNUC__
++        if (typeid(*istrm->rdbuf()) == typeid(GNUFilebuf)) {
++            filebuf = (GNUFilebuf*) istrm->rdbuf();
++        }
++#endif
++	delete istrm;
+         istrm = NULL;
+-  
++#ifdef __GNUC__
++        if (filebuf != NULL) {
++            delete filebuf;
++            filebuf = NULL;
++        }
++#endif
++
+         }  catch (std::runtime_error const& e/* e */) 
+         {
+             LASError_PushError(LE_Failure, e.what(), "LASReader_Destroy");
+@@ -1553,8 +1616,8 @@ LAS_DLL char* LASHeader_GetXML(const LAS
+ LAS_DLL void LASHeader_Destroy(LASHeaderH hHeader)
+ {
+     VALIDATE_LAS_POINTER0(hHeader, "LASHeader_Destroy");
+-    // delete ((liblas::Header*) hHeader);
+-    // hHeader=NULL;
++    delete hHeader;
++    hHeader = NULL;
+ }
+ 
+ LAS_DLL LASHeaderH LASHeader_Copy(const LASHeaderH hHeader) {
+@@ -1696,6 +1759,71 @@ LAS_DLL LASWriterH LASWriter_Create(cons
+     
+ }
+ 
++LAS_DLL LASWriterH LASWriter_CreateFd(int fd, const LASHeaderH hHeader, int mode)
++{
++    VALIDATE_LAS_POINTER1(hHeader->get(), "LASWriter_Create", NULL);
++
++#ifdef __GNUC__
++    __gnu_cxx::stdio_filebuf<char> *filebuf = NULL;
++    std::ostream* ostrm = NULL;
++
++    try
++    {
++        std::ios::openmode m;
++        if ( (mode > 2) || (mode < 1)) {
++            throw std::runtime_error("File mode must be eWrite or eAppend");
++        }
++
++        // append mode 
++        if (mode == 2) {
++            m = std::ios::out | std::ios::in | std::ios::binary | std::ios::ate;
++        }
++        // write mode
++        else {
++            m = std::ios::out | std::ios::binary | std::ios::ate;
++        }
++
++        filebuf = new __gnu_cxx::stdio_filebuf<char>(fd, m);
++        if (filebuf == NULL) {
++            LASError_PushError(LE_Failure, "Failed to create stdio_filebuf",
++                               "LASWriter_CreateFd");
++            return NULL;
++        }
++
++        ostrm = new std::ostream(filebuf);
++
++    } catch (std::exception const& e)
++    {
++        if (ostrm)
++            delete ostrm;
++        if (filebuf)
++            delete filebuf;
++        LASError_PushError(LE_Failure, e.what(), "LASWriter_CreateFd");
++        return NULL;
++    }
++
++
++    try {
++
++        liblas::HeaderPtr* header = ((liblas::HeaderPtr*) hHeader);
++        liblas::Writer* writer = new liblas::Writer(*ostrm, *header->get());
++
++        writers.insert(std::pair<liblas::Writer*, std::ostream*>(writer, ostrm));
++        return (LASWriterH) writer;
++
++
++    } catch (std::exception const& e)
++    {
++        LASError_PushError(LE_Failure, e.what(), "LASWriter_Create");
++        return NULL;
++    }
++#else
++    LASError_PushError(LE_Failure, "Function is implemented only on platforms "
++                                   "with GNU libstdc++", "LASWriter_CreateFd");
++    return NULL;
++#endif
++}
++
+ LAS_DLL LASErrorEnum LASWriter_WritePoint(const LASWriterH hWriter, const LASPointH hPoint) {
+ 
+     VALIDATE_LAS_POINTER1(hPoint, "LASWriter_WritePoint", LE_Failure);
+@@ -1767,6 +1895,10 @@ LAS_DLL void LASWriter_Destroy(LASWriter
+ {
+     VALIDATE_LAS_POINTER0(hWriter, "LASWriter_Destroy");
+ 
++#ifdef __GNUC__
++    GNUFilebuf *filebuf = NULL;
++#endif
++
+     try { 
+         liblas::Writer* writer = (liblas::Writer*)hWriter;
+ 
+@@ -1791,7 +1923,21 @@ LAS_DLL void LASWriter_Destroy(LASWriter
+         
+         writers.erase(writer);
+         
++        ostrm->flush();
++
++#ifdef __GNUC__
++        if (typeid(*ostrm->rdbuf()) == typeid(GNUFilebuf)) {
++            filebuf = (GNUFilebuf*) ostrm->rdbuf();
++        }
++#endif
++	delete ostrm;
+         ostrm = NULL;
++#ifdef __GNUC__
++        if (filebuf != NULL) {
++            delete filebuf;
++            filebuf = NULL;
++        }
++#endif
+   
+         }  catch (std::runtime_error const& e/* e */) 
+         {
