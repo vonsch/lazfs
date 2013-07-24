@@ -1356,7 +1356,7 @@ struct fuse_operations lazfs_oper = {
 void
 lazfs_usage()
 {
-	fprintf(stderr, "usage:  bbfs [FUSE and mount options] rootDir mountPoint\n");
+	fprintf(stderr, "usage:  lazfs [FUSE and mount options] rootDir mountPoint\n");
 	abort();
 }
 
@@ -1367,10 +1367,13 @@ main(int argc, char *argv[])
 	struct lazfs_state *lazfs_data;
 
 #if 0
-	// bbfs doesn't do any access checking on its own (the comment
+	// NOTE: lazfs currently does some security checking but it needs to be reviewed.
+	// This statement shouldn't be removed before such review.
+	//
+	// lazfs doesn't do any access checking on its own (the comment
 	// blocks in fuse.h mention some of the functions that need
 	// accesses checked -- but note there are other functions, like
-	// chown(), that also need checking!).  Since running bbfs as root
+	// chown(), that also need checking!).  Since running lazfs as root
 	// will therefore open Metrodome-sized holes in the system
 	// security, we'll check if root is trying to mount the filesystem
 	// and refuse if it is.  The somewhat smaller hole of an ordinary

@@ -21,7 +21,7 @@
 // setlinebuf() later in consequence.
 #define _XOPEN_SOURCE 500
 
-// maintain bbfs state in here
+// maintain lazfs state in here
 #include <limits.h>
 #include <stdio.h>
 #include "cache.h"
