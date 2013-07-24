@@ -1,0 +1,44 @@
+LazFS filesystem overview
+--------
+
+LazFS filesystem is just a "wrapper". It is indended to store data in LiDAR
+format. LiDAR files are transparently compressed via laszip algorithm when
+application saves LiDAR data and are transparently decompressed when application
+accesses the LiDAR file.
+
+Compression ratio is around 1:8 to 1:10 so 100GB of uncompressed LiDAR data
+occupies around 10 - 15 GB of disk space.
+
+LazFS treats all files with ".las" suffix as LiDAR files so attempting to store
+file with ".las" suffix which isn't a LiDAR file ends with error.
+
+Please note that LazFS is currently experimental filesystem and it
+_shouldn't_ be used in production. Make sure you have backup of all your LiDAR
+data!
+
+LazFS requirements
+--------
+
+LazFS must run on top of the filesystem which supports extended attributes. It
+was tested on XFS and Ext4.
+
+LazFS internals
+--------
+
+LazFS is mostly stateless filesystem. All stored data can be transparently
+accessed directly on the underlying filesystem. Currently it stores only one
+information per LiDAR file in extended attribute - decompressed file size to
+speed up *stat() calls.
+
+When application accesses a LiDAR file, it is decompressed into /tmp/ in open()
+syscall and application works directly with file in /tmp/. After it closes() it,
+decompressed file is removed. When files are created, they are also created and
+accessed in uncompressed form via /tmp/ and are compressed when they are closed.
+
+Example of usage
+--------
+
+./lazfs -o suid,allow_other,default_permissions <backend_dir> <target_dir>
+
+After this call, you can work with <target_dir> and LiDAR data will be stored in
+compressed form in <backend_dir>.
