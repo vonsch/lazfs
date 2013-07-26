@@ -10,7 +10,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_PROG_CC
 
 # Checks for libraries.
-AC_CHECK_LIB([las_c], [LASReader_CreateFd])
+AC_CHECK_LIB([las_c], [LASReader_CreateFromFile])
 dnl AC_CHECK_LIB([lrzip], [lrzip_new])
 PKG_CHECK_MODULES([FUSE], [fuse])
 

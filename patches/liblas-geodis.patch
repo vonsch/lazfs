@@ -1,6 +1,6 @@
 diff -up libLAS-1.7.0/CMakeLists.txt.geodis libLAS-1.7.0/CMakeLists.txt
 --- libLAS-1.7.0/CMakeLists.txt.geodis	2012-01-05 22:43:28.000000000 +0100
-+++ libLAS-1.7.0/CMakeLists.txt	2013-07-23 16:15:57.991693368 +0200
++++ libLAS-1.7.0/CMakeLists.txt	2013-07-26 10:29:36.514424436 +0200
 @@ -140,7 +140,7 @@ else()
    # Recommended C++ compilation flags
    # -Weffc++
@@ -12,8 +12,16 @@ diff -up libLAS-1.7.0/CMakeLists.txt.geodis libLAS-1.7.0/CMakeLists.txt
  
 diff -up libLAS-1.7.0/include/liblas/capi/liblas.h.geodis libLAS-1.7.0/include/liblas/capi/liblas.h
 --- libLAS-1.7.0/include/liblas/capi/liblas.h.geodis	2012-01-05 22:43:28.000000000 +0100
-+++ libLAS-1.7.0/include/liblas/capi/liblas.h	2013-07-23 16:15:57.991693368 +0200
-@@ -155,6 +155,16 @@ LAS_DLL LASReaderH LASReader_Create(cons
++++ libLAS-1.7.0/include/liblas/capi/liblas.h	2013-07-26 10:34:44.174083617 +0200
+@@ -47,6 +47,7 @@
+ #include "las_version.h"
+ #include "las_config.h"
+ #include <liblas/export.hpp>
++#include <stdio.h>
+ 
+ typedef struct LASWriterHS *LASWriterH;
+ typedef struct LASReaderHS *LASReaderH;
+@@ -155,6 +156,16 @@ LAS_DLL LASReaderH LASReader_Create(cons
  LAS_DLL LASReaderH LASReader_CreateWithHeader(  const char * filename, 
                                                  LASHeaderH hHeader);
  
@@ -25,12 +33,12 @@ diff -up libLAS-1.7.0/include/liblas/capi/liblas.h.geodis libLAS-1.7.0/include/l
 + * @return opaque pointer to a LASReaderH instance.
 + * @param fd File descriptor opened for read
 + */
-+LAS_DLL LASReaderH LASReader_CreateFd(int fd);
++LAS_DLL LASReaderH LASReader_CreateFromFile(FILE *fp);
 +
  /** Reads the next available point on the LASReaderH instance.  If no point 
   *  is available to read, NULL is returned.  If an error happens during 
   *  the reading of the next available point, an error will be added to the 
-@@ -940,6 +950,20 @@ LAS_DLL char* LASHeader_GetXML(const LAS
+@@ -940,6 +951,20 @@ LAS_DLL char* LASHeader_GetXML(const LAS
  */
  LAS_DLL LASWriterH LASWriter_Create(const char* filename, const LASHeaderH hHeader, int mode);
  
@@ -46,14 +54,14 @@ diff -up libLAS-1.7.0/include/liblas/capi/liblas.h.geodis libLAS-1.7.0/include/l
 + *  operations.  Valid values are LAS_MODE_APPEND and LAS_MODE_WRITE.
 + *  @return opaque pointer to a LASWriterH instance.
 + */
-+LAS_DLL LASWriterH LASWriter_CreateFd(int fd, const LASHeaderH hHeader, int mode);
++LAS_DLL LASWriterH LASWriter_CreateFromFile(FILE *fp, const LASHeaderH hHeader, int mode);
 +
  /** Writes a point to the file.  The location of where the point is writen is 
   *  determined by the mode the file is opened in, and what the last operation was.  
   *  For example, if the file was opened for append, the next point would be written 
 diff -up libLAS-1.7.0/src/c_api.cpp.geodis libLAS-1.7.0/src/c_api.cpp
 --- libLAS-1.7.0/src/c_api.cpp.geodis	2012-01-05 22:43:28.000000000 +0100
-+++ libLAS-1.7.0/src/c_api.cpp	2013-07-24 10:17:06.817609232 +0200
++++ libLAS-1.7.0/src/c_api.cpp	2013-07-26 10:29:36.515424451 +0200
 @@ -83,6 +83,11 @@ typedef struct LASFilterHS *LASFilterH;
  #include <typeinfo>
  #include <vector>
@@ -70,16 +78,16 @@ diff -up libLAS-1.7.0/src/c_api.cpp.geodis libLAS-1.7.0/src/c_api.cpp
  
  }
  
-+LAS_DLL LASReaderH LASReader_CreateFd(int fd)
++LAS_DLL LASReaderH LASReader_CreateFromFile(FILE *fp)
 +{
 +#ifdef __GNUC__
 +    GNUFilebuf *filebuf = NULL;
 +    std::istream *istrm = NULL;
 +
-+    filebuf = new GNUFilebuf(fd, std::ios::in | std::ios::binary);
++    filebuf = new GNUFilebuf(fp, std::ios::in | std::ios::binary);
 +    if (filebuf == NULL) {
 +        LASError_PushError(LE_Failure, "Failed to create stdio_filebuf",
-+                           "LASReader_CreateFd");
++                           "LASReader_CreateFromFile");
 +        return NULL;
 +    }
 +    try {
@@ -90,7 +98,7 @@ diff -up libLAS-1.7.0/src/c_api.cpp.geodis libLAS-1.7.0/src/c_api.cpp
 +            delete istrm; 
 +        if (filebuf)
 +            delete filebuf;
-+        LASError_PushError(LE_Failure, e.what(), "LASReader_CreateFd");
++        LASError_PushError(LE_Failure, e.what(), "LASReader_CreateFromFile");
 +        return NULL;
 +    }
 +
@@ -101,12 +109,12 @@ diff -up libLAS-1.7.0/src/c_api.cpp.geodis libLAS-1.7.0/src/c_api.cpp
 +        return (LASReaderH) reader;
 +    } catch (std::exception const& e)
 +    {
-+        LASError_PushError(LE_Failure, e.what(), "LASReader_CreateFd");
++        LASError_PushError(LE_Failure, e.what(), "LASReader_CreateFromFile");
 +        return NULL;
 +    }
 +#else
 +    LASError_PushError(LE_Failure, "Function is implemented only on platforms "
-+                                   "with GNU libstdc++", "LASReader_CreateFd");
++                                   "with GNU libstdc++", "LASReader_CreateFromFile");
 +    return NULL;
 +#endif
 +}
@@ -163,12 +171,12 @@ diff -up libLAS-1.7.0/src/c_api.cpp.geodis libLAS-1.7.0/src/c_api.cpp
      
  }
  
-+LAS_DLL LASWriterH LASWriter_CreateFd(int fd, const LASHeaderH hHeader, int mode)
++LAS_DLL LASWriterH LASWriter_CreateFromFile(FILE *fp, const LASHeaderH hHeader, int mode)
 +{
 +    VALIDATE_LAS_POINTER1(hHeader->get(), "LASWriter_Create", NULL);
 +
 +#ifdef __GNUC__
-+    __gnu_cxx::stdio_filebuf<char> *filebuf = NULL;
++    GNUFilebuf *filebuf = NULL;
 +    std::ostream* ostrm = NULL;
 +
 +    try
@@ -187,10 +195,10 @@ diff -up libLAS-1.7.0/src/c_api.cpp.geodis libLAS-1.7.0/src/c_api.cpp
 +            m = std::ios::out | std::ios::binary | std::ios::ate;
 +        }
 +
-+        filebuf = new __gnu_cxx::stdio_filebuf<char>(fd, m);
++        filebuf = new GNUFilebuf(fp, m);
 +        if (filebuf == NULL) {
 +            LASError_PushError(LE_Failure, "Failed to create stdio_filebuf",
-+                               "LASWriter_CreateFd");
++                               "LASWriter_CreateFromFile");
 +            return NULL;
 +        }
 +
@@ -202,7 +210,7 @@ diff -up libLAS-1.7.0/src/c_api.cpp.geodis libLAS-1.7.0/src/c_api.cpp
 +            delete ostrm;
 +        if (filebuf)
 +            delete filebuf;
-+        LASError_PushError(LE_Failure, e.what(), "LASWriter_CreateFd");
++        LASError_PushError(LE_Failure, e.what(), "LASWriter_CreateFromFile");
 +        return NULL;
 +    }
 +
@@ -223,7 +231,7 @@ diff -up libLAS-1.7.0/src/c_api.cpp.geodis libLAS-1.7.0/src/c_api.cpp
 +    }
 +#else
 +    LASError_PushError(LE_Failure, "Function is implemented only on platforms "
-+                                   "with GNU libstdc++", "LASWriter_CreateFd");
++                                   "with GNU libstdc++", "LASWriter_CreateFromFile");
 +    return NULL;
 +#endif
 +}

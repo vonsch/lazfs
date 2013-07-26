@@ -21,9 +21,9 @@ laz_processfile(int sfd, int dfd, char compress)
 
 	log_debug("\nlaz_processfile: sfd: \"%d\", dfd:\"%d\"\n", sfd, dfd);
 
-	reader = LASReader_CreateFd(sfd);
+	reader = LASReader_CreateFromFile(fdopen(sfd, "r"));
 	if (reader == NULL) {
-		log_error("    ERROR: LASReader_CreateFd failed: %s\n",
+		log_error("    ERROR: LASReader_CreateFromFile failed: %s\n",
 		LASError_GetLastErrorMsg());
 		/* FIXME: We should return more codes */
 		ret = -ENOMEM;
@@ -46,9 +46,9 @@ laz_processfile(int sfd, int dfd, char compress)
 		goto cleanup;
 	}
 
-	writer = LASWriter_CreateFd(dfd, wheader, LAS_MODE_WRITE);
+	writer = LASWriter_CreateFromFile(fdopen(dfd, "w"), wheader, LAS_MODE_WRITE);
 	if (writer == NULL) {
-		log_error("    ERROR: LASWriter_CreateFd failed: %s\n",
+		log_error("    ERROR: LASWriter_CreateFromFile failed: %s\n",
 		LASError_GetLastErrorMsg());
 		ret = -ENOMEM;
 		goto cleanup;
