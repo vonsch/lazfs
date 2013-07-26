@@ -10,6 +10,7 @@
 #include <limits.h>
 #include <string.h>
 #include <pthread.h>
+#include <sys/types.h>
 
 #define LOCK(mutex) \
 	do { \
@@ -22,6 +23,13 @@
 	do { \
 		if (pthread_mutex_unlock(&mutex) != 0) { \
 			abort(); /* Failing to release a lock means a bug */ \
+		} \
+	} while (0)
+
+#define WAIT(cond, mutex) \
+	do { \
+		if (pthread_cond_wait(&(cond), &(mutex)) != 0) { \
+			abort(); /* Failure indicates a bug */ \
 		} \
 	} while (0)
 
