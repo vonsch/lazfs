@@ -5,6 +5,8 @@ lazfs_SOURCES = cache.h cache.c compress_laz.h compress_laz.c \
 
 #lazfs_SOURCES += compress_lrzip.h compress_lrzip.c
 
+EXTRA_DIST = compress_lrzip.h compress_lrzip.c
+
 lazfs_CFLAGS = $(FUSE_CFLAGS)
 
 lazfs_LDADD = $(FUSE_LIBS) # $(LIBS)
