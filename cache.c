@@ -9,6 +9,7 @@
 
 #include "cache.h"
 #include "util.h"
+#include "workq.h"
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
@@ -25,6 +26,12 @@ struct file_entry {
 	int tmpfd; /* Open fd of the temporary decompressed .las */
 	int refs; /* Number of external references to this entry */
 	char dirty; /* Tracks if compressed file need to be updated */
+
+	/* Asynchronous compression/decompression */
+	char ready; /* Zero if file is being compressed/decompressed */
+	int err; /* Tracks if compression/decompression was successfull */
+	pthread_cond_t cond; /* Block on this variable to wait until file is compressed */
+
 	LIST_ENTRY(file_entry) link;
 };
 
@@ -37,6 +44,7 @@ static void
 file_entry_destroy(file_entry_t **entryp)
 {
 	file_entry_t *entry;
+	int err;
 
 	assert(entryp != NULL && *entryp != NULL);
 
@@ -45,6 +53,10 @@ file_entry_destroy(file_entry_t **entryp)
 		free(entry->tmpname);
 	if (entry->name != NULL)
 		free(entry->name);
+
+	err = pthread_cond_destroy(&entry->cond);
+	assert(err == 0);
+
 	free(entry);
 	*entryp = NULL;
 }
@@ -77,6 +89,9 @@ file_entry_create(file_entry_t **entryp, const char *filename,
 		err = errno;
 		goto cleanup;
 	}
+
+	err = pthread_cond_init(&entry->cond, NULL);
+	assert(err == 0);
 
 	entry->fd = fd;
 	entry->tmpfd = tmpfd;
@@ -139,12 +154,19 @@ cache_destroy(laz_cache_t **cachep)
 
 int
 cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
-	  int fd, int tmpfd)
+	  int fd, int tmpfd, lazfs_workq_t *workq)
 {
 	int err = 0;
 	file_entry_t *entry = NULL;
+	lazfs_workq_job_t *job = NULL;
 
 	assert(cache != NULL);
+
+	if (workq != NULL) {
+		job = malloc(sizeof(*job));
+		if (job == NULL)
+			return -ENOMEM;
+	}
 
 	err = file_entry_create(&entry, filename, tmpfilename, fd, tmpfd);
 	if (err)
@@ -153,7 +175,25 @@ cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
 	entry->refs++;
 	LIST_INSERT_HEAD(&cache->entries, entry, link);
 
+	if (workq != NULL) {
+		job->routine = lazfs_decompress;
+		job->sfd = fd;
+		job->dfd = tmpfd;
+		job->ret = &entry->err;
+		job->complete = &entry->ready;
+		job->signal = &entry->cond;
+
+		lazfs_workq_run(workq, job);
+	} else {
+		/* No work is needed, mark file as ready */
+		entry->ready = 1;
+	}
+
+	return 0;
+
 cleanup:
+	if (job != NULL)
+		free(job);
 	return err;
 }
 
@@ -213,6 +253,10 @@ cache_get(laz_cache_t *cache, const char *filename, char increfs, laz_cachestat_
 		if (strcmp(entry->name, filename) == 0) {
 			if (increfs)
 				entry->refs++;
+
+			while (!entry->ready) {
+				WAIT(entry->cond, cache->lock);
+			}
 
 			cstat->tmppath = entry->tmpname;
 			cstat->fd = entry->fd;

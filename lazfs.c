@@ -447,19 +447,12 @@ lazfs_open(const char *path, struct fuse_file_info *fi)
 			goto cleanup;
 		}
 
-		decompressed = 1;
-
-		retstat = lazfs_decompress(fd, tmpfd);
-		if (retstat != 0) {
-			log_error("lazfs_open: lazfs_decompress failed");
-			goto cleanup;
-		}
-
-		retstat = cache_add(cache, path, tmppath, fd, tmpfd);
+		retstat = cache_add(cache, path, tmppath, fd, tmpfd, LAZFS_DATA->workq);
 		if (retstat != 0) {
 			log_error("lazfs_open: cache_add failed");
 			goto cleanup;
 		}
+		decompressed = 1;
 	} else {
 		fd = open(fpath, fi->flags);
 		if (fd < 0) {
@@ -1089,6 +1082,16 @@ lazfs_init(struct fuse_conn_info *conn)
 {
 	log_debug("\nlazfs_init()\n");
 
+	/*
+	 * Initialize work queue. Otherwise daemon() function called from
+	 * fuse_main() will terminate all threads.
+	 */
+	LAZFS_DATA->workq = NULL;
+	if (lazfs_workq_create(&LAZFS_DATA->workq, 6) != 0) {
+		perror("Failed to create work queue");
+		abort();
+	}
+
 	return LAZFS_DATA;
 }
 
@@ -1184,7 +1187,7 @@ lazfs_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 			goto cleanup;
 		}
 
-		retstat = cache_add(cache, path, tmppath, fd, tmpfd);
+		retstat = cache_add(cache, path, tmppath, fd, tmpfd, NULL);
 		if (retstat != 0) {
 			log_error("lazfs_open: cache_add failed");
 			goto cleanup;

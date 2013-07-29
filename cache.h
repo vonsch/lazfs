@@ -8,6 +8,7 @@
 #ifndef _CACHE_H_
 #define _CACHE_H_
 
+#include "workq.h"
 #include <sys/types.h>
 
 /* All cache_* functions below returns -errno as errors */
@@ -31,12 +32,13 @@ void
 cache_destroy(laz_cache_t **cachep);
 
 /*
- * Adds existing decompressed file + it's open fd to cache. Initial cache
+ * Adds file which is not yet decompressed + it's open fd to cache and run
+ * decompression in separate thread (via workq). Initial cache
  * external references count is 1.
  */
 int
 cache_add(laz_cache_t *cache, const char *filename, const char *tmpfilename,
-	  int fd, int tmpfd);
+	  int fd, int tmpfd, lazfs_workq_t *workq);
 
 /* Removes file from cache. */
 void

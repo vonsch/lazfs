@@ -19,7 +19,10 @@ laz_processfile(int sfd, int dfd, char compress)
 	LASPointH p = NULL;
 	int ret = 0;
 
-	log_debug("\nlaz_processfile: sfd: \"%d\", dfd:\"%d\"\n", sfd, dfd);
+	/*
+	 * FIXME: No logging works here because this function is not called from fuse
+	 * thread. It is called from workq thread. */
+	//log_debug("\nlaz_processfile: sfd: \"%d\", dfd:\"%d\"\n", sfd, dfd);
 
 	reader = LASReader_CreateFromFile(fdopen(sfd, "r"));
 	if (reader == NULL) {

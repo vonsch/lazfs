@@ -25,10 +25,12 @@
 #include <limits.h>
 #include <stdio.h>
 #include "cache.h"
+#include "workq.h"
 struct lazfs_state {
     FILE *logfile;
     char *rootdir;
     laz_cache_t *cache;
+    lazfs_workq_t *workq;
 };
 #define LAZFS_DATA ((struct lazfs_state *) fuse_get_context()->private_data)
 
