@@ -48,6 +48,14 @@ cache_remove(laz_cache_t *cache, const char *filename);
 void
 cache_dirty(laz_cache_t *cache, const char *filename);
 
+/*
+ * Mark file in cache as dead (i.e. it will be removed and shouldn't be reused
+ * and compress it via workq.
+ */
+int
+cache_finish(laz_cache_t *cache, const char *filename, int fd, int tmpfd,
+	     lazfs_workq_t *workq);
+
 /* Get item from cache. Returns zero if found. */
 int
 cache_get(laz_cache_t *cache, const char *filename, char increfs,

@@ -30,7 +30,8 @@ struct file_entry {
 	/* Asynchronous compression/decompression */
 	char ready; /* Zero if file is being compressed/decompressed */
 	int err; /* Tracks if compression/decompression was successfull */
-	pthread_cond_t cond; /* Block on this variable to wait until file is compressed */
+	char dead; /* Tracks if this cache entry is being removed and compressed and shouldn't be reused */
+	pthread_cond_t cond; /* Block on this variable to wait until file is compressed/decompressed */
 
 	LIST_ENTRY(file_entry) link;
 };
@@ -241,6 +242,47 @@ cache_dirty(laz_cache_t *cache, const char *filename)
 }
 
 int
+cache_finish(laz_cache_t *cache, const char *filename, int fd, int tmpfd,
+	     lazfs_workq_t *workq)
+{
+	file_entry_t *entry;
+	lazfs_workq_job_t *job = NULL;
+	int err;
+	char complete;
+
+	assert(cache != NULL);
+
+	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
+		if (strcmp(entry->name, filename) == 0) {
+			entry->dead = 1;
+			job = malloc(sizeof(*job));
+			if (job == NULL)
+				return -ENOMEM;
+
+			job->routine = &lazfs_compress;
+			job->sfd = fd;
+			job->dfd = tmpfd;
+			job->ret = &err;
+			job->complete = &complete;
+			job->signal = &entry->cond;
+			lazfs_workq_run(workq, job);
+
+			while (!complete) {
+				WAIT(entry->cond, cache->lock);
+			}
+		}
+	}
+
+	return 0;
+
+cleanup:
+	if (job != NULL)
+		free(job);
+
+	return err;
+}
+
+int
 cache_get(laz_cache_t *cache, const char *filename, char increfs, laz_cachestat_t *cstat)
 {
 	file_entry_t *entry;
@@ -251,6 +293,17 @@ cache_get(laz_cache_t *cache, const char *filename, char increfs, laz_cachestat_
 
 	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
 		if (strcmp(entry->name, filename) == 0) {
+			/*
+			 * If file is dead (i.e. being compressed), don't allow to work with
+			 * it until compression gets finished.
+ 			 */
+			while (entry->dead) {
+				WAIT(entry->cond, cache->lock);
+			}
+
+			if (entry->dead)
+				return 1;
+
 			if (increfs)
 				entry->refs++;
 

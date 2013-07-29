@@ -707,7 +707,7 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 					goto cleanup;
 				}
 
-				ret = lazfs_compress(cstat.tmpfd, compressfd);
+				ret = cache_finish(cache, path, cstat.tmpfd, compressfd, LAZFS_DATA->workq);
 				if (ret != 0) {
 					retstat = ret;
 					goto cleanup;
