@@ -302,13 +302,7 @@ cache_get(laz_cache_t *cache, const char *filename, char increfs, laz_cachestat_
 
 	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
 		if (strcmp(entry->name, filename) == 0) {
-			/*
-			 * If file is dead (i.e. being compressed), don't allow to work with
-			 * it until compression gets finished.
- 			 */
-			while (entry->dead) {
-				WAIT(entry->cond, cache->lock);
-			}
+			cache_waitentry(cache, entry);
 
 			if (entry->dead)
 				return 1;
