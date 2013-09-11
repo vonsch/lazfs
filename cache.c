@@ -248,7 +248,6 @@ cache_finish(laz_cache_t *cache, const char *filename, int fd, int tmpfd,
 	file_entry_t *entry;
 	lazfs_workq_job_t *job = NULL;
 	int err;
-	char complete;
 
 	assert(cache != NULL);
 
@@ -259,15 +258,17 @@ cache_finish(laz_cache_t *cache, const char *filename, int fd, int tmpfd,
 			if (job == NULL)
 				return -ENOMEM;
 
+			entry->ready = 0;
+
 			job->routine = &lazfs_compress;
 			job->sfd = fd;
 			job->dfd = tmpfd;
 			job->ret = &err;
-			job->complete = &complete;
+			job->complete = &entry->ready;
 			job->signal = &entry->cond;
 			lazfs_workq_run(workq, job);
 
-			while (!complete) {
+			while (!entry->ready) {
 				WAIT(entry->cond, cache->lock);
 			}
 		}
