@@ -56,10 +56,17 @@ int
 cache_finish(laz_cache_t *cache, const char *filename, int fd, int tmpfd,
 	     lazfs_workq_t *workq);
 
-/* Get item from cache. Returns zero if found. */
+/* 
+ * Get item from cache, waits if item is being compressed/decompressed.
+ * Returns zero if found. 
+ */
 int
 cache_get(laz_cache_t *cache, const char *filename, char increfs,
 	  laz_cachestat_t *cstat);
+
+/* Waits until cache item gets ready, i.e. isn't being compressed/decompressed */
+void
+cache_wait(laz_cache_t *cache, const char *filename);
 
 /* Lock the cache */
 void

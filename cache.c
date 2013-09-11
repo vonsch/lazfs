@@ -106,6 +106,14 @@ cleanup:
 	return -err;
 }
 
+static inline void
+cache_waitentry(laz_cache_t *cache, file_entry_t *entry)
+{
+	while (!entry->ready) {
+		WAIT(entry->cond, cache->lock);
+	}
+}
+
 int
 cache_create(laz_cache_t **cachep)
 {
@@ -322,6 +330,20 @@ cache_get(laz_cache_t *cache, const char *filename, char increfs, laz_cachestat_
 	}
 
 	return (entry != NULL) ? 0 : 1;
+}
+
+void
+cache_wait(laz_cache_t *cache, const char *filename)
+{
+	file_entry_t *entry;
+
+	assert(cache != NULL);
+	assert(filename != NULL);
+
+	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
+		if (strcmp(entry->name, filename) == 0)
+			cache_waitentry(cache, entry);
+	}
 }
 
 void
