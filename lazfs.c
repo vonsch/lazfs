@@ -1364,7 +1364,7 @@ void
 lazfs_usage()
 {
 	fprintf(stderr, "usage:  lazfs [FUSE and mount options] rootDir mountPoint\n");
-	abort();
+	exit(1);
 }
 
 int
