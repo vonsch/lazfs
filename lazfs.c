@@ -748,6 +748,8 @@ lazfs_release(const char *path, struct fuse_file_info *fi)
 				retstat = lazfs_setsize(fpath_laz, statbuf.st_size);
 				if (retstat != 0)
 					goto cleanup;
+
+				cache_markready(cache, path);
 			}
 cleanup:
 			if (compressfd != -1) {

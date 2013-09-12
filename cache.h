@@ -49,8 +49,9 @@ void
 cache_dirty(laz_cache_t *cache, const char *filename);
 
 /*
- * Mark file in cache as dead (i.e. it will be removed and shouldn't be reused
- * and compress it via workq.
+ * Mark file in cache as not ready dead (i.e. it will be removed and shouldn't be reused
+ * and compress it via workq. After return file should be marked as "ready" via
+ * cache_markready();
  */
 int
 cache_finish(laz_cache_t *cache, const char *filename, int fd, int tmpfd,
@@ -63,6 +64,12 @@ cache_finish(laz_cache_t *cache, const char *filename, int fd, int tmpfd,
 int
 cache_get(laz_cache_t *cache, const char *filename, char increfs,
 	  laz_cachestat_t *cstat);
+
+/*
+ * Marks file as "ready"
+ */
+void
+cache_markready(laz_cache_t *cache, const char *filename);
 
 /* Waits until cache item gets ready, i.e. isn't being compressed/decompressed */
 void

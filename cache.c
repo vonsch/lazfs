@@ -255,7 +255,8 @@ cache_finish(laz_cache_t *cache, const char *filename, int fd, int tmpfd,
 {
 	file_entry_t *entry;
 	lazfs_workq_job_t *job = NULL;
-	int err;
+	int err = 0;
+	char complete = 0;
 
 	assert(cache != NULL);
 
@@ -272,21 +273,17 @@ cache_finish(laz_cache_t *cache, const char *filename, int fd, int tmpfd,
 			job->sfd = fd;
 			job->dfd = tmpfd;
 			job->ret = &err;
-			job->complete = &entry->ready;
+			job->complete = &complete;
 			job->signal = &entry->cond;
 			lazfs_workq_run(workq, job);
 
-			while (!entry->ready) {
+			while (!complete) {
 				WAIT(entry->cond, cache->lock);
 			}
+
+			break;
 		}
 	}
-
-	return 0;
-
-cleanup:
-	if (job != NULL)
-		free(job);
 
 	return err;
 }
@@ -324,6 +321,23 @@ cache_get(laz_cache_t *cache, const char *filename, char increfs, laz_cachestat_
 	}
 
 	return (entry != NULL) ? 0 : 1;
+}
+
+void
+cache_markready(laz_cache_t *cache, const char *filename)
+{
+	file_entry_t *entry;
+
+	assert(cache != NULL);
+	assert(filename != NULL);
+
+	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
+		if (strcmp(entry->name, filename) == 0) {
+			entry->ready = 1;
+			pthread_cond_signal(&entry->cond);
+			break;
+		}
+	}
 }
 
 void
