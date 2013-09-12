@@ -67,6 +67,8 @@ lazfs_getattr(const char *path, struct stat *statbuf)
 		cache_lock(cache);
 		locked = 1;
 
+		cache_wait(cache, path); /* Wait if file is being processed */
+
 		retstat = lstat(fpath_laz, statbuf);
 		if (retstat != 0) {
 			retstat = lazfs_error("lazfs_getattr lstat");
