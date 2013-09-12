@@ -1374,6 +1374,9 @@ main(int argc, char *argv[])
 	struct lazfs_state *lazfs_data;
 
 #if 0
+	// FIXME: This comment comes from original bbfs source, remove it once
+	// all functions gets checked.
+	//
 	// NOTE: lazfs currently does some security checking but it needs to be reviewed.
 	// This statement shouldn't be removed before such review.
 	//
