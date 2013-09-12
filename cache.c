@@ -335,8 +335,10 @@ cache_wait(laz_cache_t *cache, const char *filename)
 	assert(filename != NULL);
 
 	for (entry = cache->entries.lh_first; entry != NULL; entry = entry->link.le_next) {
-		if (strcmp(entry->name, filename) == 0)
+		if (strcmp(entry->name, filename) == 0) {
 			cache_waitentry(cache, entry);
+			return;
+		}
 	}
 }
 
